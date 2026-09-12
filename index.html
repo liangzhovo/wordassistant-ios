@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词助手 · 完整版</title>
+    <style>
+        :root {
+            --primary:#4A6CF7; --bg:#F8FAFC; --card:#ffffff; --text:#1E293B; --text-secondary:#64748B;
+            --text-tertiary:#475569; --border:#E2E8F0; --border-light:#F1F5F9; --muted:#F1F5F9;
+            --muted-strong:#E2E8F0; --muted-stronger:#CBD5E1; --header-bg:rgba(255,255,255,0.8);
+            --header-border:rgba(255,255,255,0.4); --nav-bg:rgba(255,255,255,0.9); --modal-bg:#ffffff;
+            --autocomplete-bg:#ffffff; --hover-bg:#F8FAFC; --shadow:rgba(0,0,0,0.05); --shadow-lg:rgba(0,0,0,0.12);
+            --toast-bg:#1E293B; --toast-text:#ffffff; --correct-bg:#D1FAE5; --correct-text:#059669;
+            --wrong-bg:#FEE2E2; --wrong-text:#DC2626; --reviewed-bg:#DBEAFE; --reviewed-text:#2563EB;
+            --del-bg:#FEE2E2; --del-text:#DC2626; --chip-bg:#E2E8F0; --list-new-bg:#E8ECFF; --exp-bar-bg:#E2E8F0;
+            --input-border:#E2E8F0; --ease-out:cubic-bezier(0.23,1,0.32,1);
+        }
+        /* 深色模式（UI布局不变，仅切换配色） */
+        body[data-theme="dark"] {
+            --primary:#5B7CFF; --bg:#0F172A; --card:#1E293B; --text:#E2E8F0; --text-secondary:#94A3B8;
+            --text-tertiary:#A5B4C4; --border:#334155; --border-light:#293548; --muted:#293548;
+            --muted-strong:#334155; --muted-stronger:#475569; --header-bg:rgba(15,23,42,0.85);
+            --header-border:rgba(51,65,85,0.5); --nav-bg:rgba(15,23,42,0.9); --modal-bg:#1E293B;
+            --autocomplete-bg:#1E293B; --hover-bg:#293548; --shadow:rgba(0,0,0,0.35); --shadow-lg:rgba(0,0,0,0.5);
+            --toast-bg:#E2E8F0; --toast-text:#0F172A; --correct-bg:#064E3B; --correct-text:#34D399;
+            --wrong-bg:#7F1D1D; --wrong-text:#FCA5A5; --reviewed-bg:#1E3A5F; --reviewed-text:#93C5FD;
+            --del-bg:#7F1D1D; --del-text:#FCA5A5; --chip-bg:#334155; --list-new-bg:#2A3550; --exp-bar-bg:#334155;
+            --input-border:#334155;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; outline:none; -webkit-touch-callout:none; }
+        html, body { height:100%; overflow:hidden; overscroll-behavior:none; }
+        body { font-family:-apple-system,sans-serif; background:var(--bg); color:var(--text); max-width:100vw; position:fixed; inset:0; display:flex; flex-direction:column; }
+        header { flex-shrink:0; z-index:100; background:var(--header-bg); backdrop-filter:blur(20px); padding:16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--header-border); }
+        header h1 { font-size:1.2rem; color:var(--text); }
+        #levelTag { background:var(--primary); color:white; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold; }
+        .container { flex:1; min-height:0; width:100%; max-width:600px; margin:0 auto; padding:16px; padding-bottom:96px; overflow-y:auto; overflow-x:hidden; }
+        .search-wrapper { position:relative; }
+        .search-box { display:flex; gap:8px; background:var(--card); border-radius:28px; padding:6px 8px 6px 18px; box-shadow:0 4px 16px var(--shadow); border:2px solid transparent; transition:border-color 200ms var(--ease-out); margin-bottom:24px; }
+        .search-box:focus-within { border-color:var(--primary); }
+        .search-box input { flex:1; min-width:0; border:none; outline:none; font-size:1rem; background:transparent; color:var(--text); cursor:text; }
+        .search-box input::placeholder { color:var(--text-secondary); }
+        /* 修复：flex item 默认 min-width:auto 会被内容撑大，挤压同排按钮；
+           按钮加 flex-shrink:0 保持固定宽度，文字 white-space:nowrap 防止竖排 */
+        button { cursor:pointer; border:none; outline:none; white-space:nowrap; flex-shrink:0; transition:transform 120ms var(--ease-out), background-color 200ms ease; }
+        button:active { transform:scale(0.95); }
+        .btn-primary { background:var(--primary); color:white; padding:10px 16px; border-radius:24px; font-weight:600; }
+        .btn-success { background:#10B981; color:white; padding:10px 16px; border-radius:24px; font-weight:600; }
+        .btn-warning { background:#F59E0B; color:white; padding:10px 16px; border-radius:24px; font-weight:600; }
+        /* 联想下拉框：visibility+max-height 组合（display 切换无法触发 transition） */
+        .autocomplete-list { position:absolute; top:100%; left:0; right:0; margin-top:6px; background:var(--autocomplete-bg); border-radius:16px; box-shadow:0 8px 24px var(--shadow-lg); z-index:200; overflow:hidden; visibility:hidden; opacity:0; transform:translateY(-14px) scale(0.96); transform-origin:top center; max-height:0; transition:opacity 0.42s var(--ease-out), transform 0.42s var(--ease-out), max-height 0.5s var(--ease-out), visibility 0s linear 0.42s; }
+        .autocomplete-list.show { visibility:visible; opacity:1; transform:translateY(0) scale(1); max-height:420px; transition:opacity 0.42s var(--ease-out), transform 0.42s var(--ease-out), max-height 0.5s var(--ease-out), visibility 0s linear 0s; }
+        /* 搜索栏清空时立即隐藏（跳过动画，避免"没消失"的错觉） */
+        .autocomplete-list.collapsed { transition:none !important; visibility:hidden !important; opacity:0 !important; max-height:0 !important; transform:none !important; }
+        /* 条目交错淡入 */
+        .auto-item { padding:12px 18px; border-bottom:1px solid var(--border-light); cursor:pointer; opacity:0; transform:translateY(10px); transition:opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out), background 0.15s ease; }
+        .auto-item:hover { background:var(--hover-bg); }
+        .autocomplete-list.show .auto-item { opacity:1; transform:translateY(0); }
+        .autocomplete-list.show .auto-item:nth-child(1) { transition-delay:0.07s, 0.07s, 0s; }
+        .autocomplete-list.show .auto-item:nth-child(2) { transition-delay:0.14s, 0.14s, 0s; }
+        .autocomplete-list.show .auto-item:nth-child(3) { transition-delay:0.21s, 0.21s, 0s; }
+        .autocomplete-list.show .auto-item:nth-child(4) { transition-delay:0.28s, 0.28s, 0s; }
+        .autocomplete-list.show .auto-item:nth-child(5) { transition-delay:0.35s, 0.35s, 0s; }
+        .auto-word { font-weight:700; color:var(--text); }
+        .auto-phon { color:var(--text-secondary); font-size:0.85rem; margin-left:6px; }
+        .auto-desc { color:var(--text-secondary); font-size:0.85rem; margin-top:2px; }
+        .card { background:var(--card); border-radius:20px; padding:18px; margin-bottom:16px; box-shadow:0 4px 16px var(--shadow); opacity:0; transform:translateY(20px); animation:slideUp 0.4s var(--ease-out) forwards; max-width:100%; overflow-x:hidden; box-sizing:border-box; }
+        #calendarCard { transition:opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+        @keyframes slideUp { to { opacity:1; transform:translateY(0); } }
+        #viewContainer, #searchResult { transition:opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out); }
+        #viewContainer.fade-out, #searchResult.fade-out { opacity:0; transform:translateY(10px); }
+
+        /* 【新增】复习计划卡片收起/展开动画 */
+        .plan-wrapper { overflow:hidden; transition:max-height 0.5s var(--ease-out), opacity 0.35s var(--ease-out), margin 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
+
+        /* 【新增】顶部加载进度条 */
+        .loading-bar { position:fixed; top:0; left:0; right:0; height:3px; z-index:9999; opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
+        .loading-bar.active { opacity:1; }
+        .loading-bar::before { content:''; position:absolute; top:0; left:0; right:0; height:100%; background:linear-gradient(90deg, transparent, var(--primary), transparent); background-size:200% 100%; background-position:200% 0; animation:loading-slide 1.2s ease-in-out infinite; }
+        @keyframes loading-slide { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+        .nav { position:fixed; bottom:0; width:100%; background:var(--nav-bg); backdrop-filter:blur(20px); display:flex; justify-content:space-around; padding:12px; border-top:1px solid var(--border); z-index:100; transition:transform 0.25s var(--ease-out); }
+        /* 键盘弹出时导航栏下移隐藏，避免被顶上来 */
+        .nav.nav-hidden { transform:translateY(120%); }
+        .nav-item { display:flex; flex-direction:column; align-items:center; font-size:0.8rem; color:var(--text-secondary); background:none; transition:color 200ms ease, transform 200ms var(--ease-out); }
+        .nav-item.active { color:var(--primary); font-weight:600; transform:translateY(-3px); }
+        .nav-item.active span { animation:bounceIn 0.5s var(--ease-out); }
+        .nav-item span { font-size:1.5rem; margin-bottom:4px; }
+        @keyframes bounceIn { 0% { transform:scale(0.8); opacity:0; } 50% { transform:scale(1.1); } 100% { transform:scale(1); opacity:1; } }
+        .option { width:100%; padding:15px; background:var(--muted); border-radius:12px; text-align:left; margin-top:10px; font-size:1.1rem; transition:all 0.2s ease; cursor:pointer; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .option:active { transform:scale(0.98); background:var(--muted-strong); }
+        .option.correct { background:var(--correct-bg); color:var(--correct-text); animation:pop 0.4s var(--ease-out); }
+        .option.wrong { background:var(--wrong-bg); color:var(--wrong-text); animation:shake 0.4s ease; }
+        @keyframes pop { 0% { transform:scale(1); } 50% { transform:scale(1.05); } 100% { transform:scale(1); } }
+        @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-5px); } 75% { transform:translateX(5px); } }
+        #reviewArea { transition:opacity 0.25s ease; }
+        .keyboard { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+        .keyboard-row { display:flex; justify-content:center; gap:5px; }
+        .key { flex:1; padding:13px 0; background:var(--muted-strong); border-radius:8px; text-align:center; font-weight:bold; cursor:pointer; transition:all 120ms var(--ease-out); color:var(--text); }
+        .key.confirm { flex:2; background:var(--primary); color:white; padding:16px 0; font-size:1.15rem; border-radius:10px; }
+        .key:active { transform:scale(0.9); background:var(--muted-stronger); }
+        .mode-switch { display:flex; background:var(--muted-strong); border-radius:24px; padding:4px; margin-bottom:16px; }
+        .mode-btn { flex:1; padding:8px; border-radius:20px; background:transparent; color:var(--text-secondary); font-weight:600; }
+        .mode-btn.active { background:var(--primary); color:white; }
+        #toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--toast-bg); color:var(--toast-text); padding:12px 24px; border-radius:24px; z-index:999; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+        .list-manager { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+        .list-chip { padding:8px 14px; background:var(--chip-bg); border-radius:20px; cursor:pointer; white-space:nowrap; font-size:0.9rem; color:var(--text); }
+        .list-chip.active { background:var(--primary); color:white; }
+        .list-new { background:var(--primary); color:white; padding:8px 14px; border-radius:20px; cursor:pointer; font-size:0.9rem; white-space:nowrap; }
+        .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.3s ease; }
+        .modal-overlay.show { opacity:1; pointer-events:auto; }
+        .modal-content { background:var(--modal-bg); border-radius:20px; padding:24px; width:90%; max-width:350px; transform:scale(0.8); transition:transform 0.3s var(--ease-out); color:var(--text); }
+        .modal-overlay.show .modal-content { transform:scale(1); }
+        /* 通用弹窗（导入导出列表选择）：缩放+淡入 */
+        .modal-mask { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:500; animation:maskFade 0.25s ease; }
+        .modal { background:var(--modal-bg); border-radius:20px; padding:24px; width:90%; max-width:350px; color:var(--text); animation:modalPop 0.3s var(--ease-out); }
+        .modal-options { max-height:60vh; overflow-y:auto; }
+        .modal-option { padding:14px 16px; border-radius:14px; background:var(--muted); margin-bottom:10px; cursor:pointer; transition:background 0.15s; }
+        .modal-option:active { background:var(--muted-strong); }
+        @keyframes maskFade { from { opacity:0; } to { opacity:1; } }
+        @keyframes modalPop { from { transform:scale(0.75); opacity:0; } to { transform:scale(1); opacity:1; } }
+        .modal-title { font-size:1.2rem; font-weight:bold; margin-bottom:16px; }
+        .list-option { width:100%; padding:15px; background:var(--muted); border-radius:12px; text-align:left; margin-top:10px; font-size:1.1rem; transition:all 0.2s ease; cursor:pointer; display:flex; justify-content:space-between; align-items:center; color:var(--text); }
+        .list-option:active { transform:scale(0.98); background:var(--muted-strong); }
+        .list-new-btn { width:100%; padding:15px; background:var(--list-new-bg); color:var(--primary); border-radius:12px; text-align:center; margin-top:10px; font-size:1.1rem; cursor:pointer; font-weight:bold; }
+        .modal-input { width:100%; padding:12px 16px; border:2px solid var(--input-border); border-radius:12px; font-size:1rem; margin-bottom:16px; outline:none; transition:border-color 0.2s; background:var(--card); color:var(--text); }
+        .modal-input:focus { border-color:var(--primary); }
+        .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+        /* 弹窗按钮统一形状（所有弹窗共用，保证风格一致） */
+        .modal-btn { display:inline-block; padding:11px 20px; border:none; border-radius:12px; font-weight:600; cursor:pointer; text-align:center; font-size:0.95rem; box-sizing:border-box; }
+        .modal-btn-cancel { background:var(--muted); color:var(--text); }
+        .modal-btn-confirm { background:var(--primary); color:#fff; }
+        .modal-btn-danger { background:#EF4444; color:#fff; }
+        .alphabet-index { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 4px; margin:10px 0; padding-bottom:4px; }
+        .alpha-btn { flex:0 0 auto; width:28px; height:28px; border-radius:50%; background:var(--muted-strong); color:var(--text); display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:0.8rem; font-weight:bold; }
+        .alpha-btn:hover { background:var(--primary); color:white; }
+        .level-box { text-align:center; margin:16px 0; }
+        .level-icon { font-size:2.5rem; }
+        .level-name { font-size:1.5rem; font-weight:700; color:var(--primary); }
+        .exp-bar { width:100%; height:10px; background:var(--exp-bar-bg); border-radius:5px; margin:12px 0; overflow:hidden; }
+        .exp-fill { height:100%; background:linear-gradient(90deg, #FFD700, #FFA500); transition:width 0.5s ease; }
+        .letter-group-title { font-weight: 800; font-size: 1.2rem; color: var(--primary); padding: 14px 0 4px 0; border-bottom: 2px solid var(--border); margin-bottom: 4px; }
+        .word-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+        .word-info { flex: 1; }
+        .word-main { font-size: 1.15rem; font-weight: 700; overflow-wrap: break-word; word-break: break-all; }
+        .word-phon { color: var(--text-secondary); font-size: 0.8rem; margin-left: 6px; }
+        .word-trans { color: var(--text-tertiary); font-size: 0.95rem; margin-top: 2px; }
+        .del-btn { background:var(--del-bg); color:var(--del-text); padding:6px 10px; border:none; border-radius:8px; cursor:pointer; flex-shrink:0; }
+        .weight-group { margin-top: 12px; }
+        .weight-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .weight-label { width: 60px; font-size: 0.9rem; color: var(--text-secondary); }
+        .weight-slider { flex: 1; accent-color: var(--primary); margin: 0 10px; }
+        .weight-slider:disabled { opacity: 0.5; }
+        .weight-value { width: 50px; text-align: right; font-weight: bold; font-size: 0.9rem; }
+        .auto-switch-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light); }
+        .auto-switch-desc { font-size: 0.85rem; color: var(--text-secondary); }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); }
+        input[type="time"] { background:var(--card); color:var(--text); border:2px solid var(--input-border); border-radius:12px; padding:8px 12px; font-size:1rem; accent-color:var(--primary); }
+
+        /* 【新增】日历样式 */
+        .calendar-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calendar-btn { background: var(--muted-strong); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; color:var(--text); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 0.8rem; }
+        .calendar-day { height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: default; }
+        .calendar-day.today { border: 1px solid var(--primary); font-weight: bold; }
+        .calendar-day.added { background: var(--correct-bg); color: var(--correct-text); }
+        .calendar-day.reviewed { background: var(--reviewed-bg); color: var(--reviewed-text); }
+        .calendar-day.both { background: linear-gradient(135deg, var(--correct-bg) 50%, var(--reviewed-bg) 50%); color: var(--text); }
+        .calendar-weekday { color: var(--text-secondary); font-size: 0.7rem; }
+
+        /* 【新增】发音按钮 */
+        .speak-btn { background:none; border:none; font-size:1.15rem; cursor:pointer; padding:0 4px; vertical-align:middle; color:var(--primary); transition:transform 120ms var(--ease-out); }
+        .speak-btn:active { transform:scale(0.8); }
+
+        /* 【新增】主题选择 */
+        .theme-options { display:flex; gap:8px; margin-top:12px; }
+        .theme-option { flex:1; padding:10px 0; border-radius:12px; background:var(--muted); color:var(--text-secondary); font-weight:600; text-align:center; cursor:pointer; transition:all 0.2s ease; }
+        .theme-option.active { background:var(--primary); color:white; }
+
+        /* 【新增】错题/打卡/统计 */
+        .stat-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-light); }
+        .stat-row:last-child { border-bottom:none; }
+        .stat-label { color:var(--text-secondary); font-size:0.95rem; }
+        .stat-value { font-weight:700; color:var(--text); }
+        .wrong-item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border-light); }
+        .wrong-item:last-child { border-bottom:none; }
+        .wrong-count { background:var(--wrong-bg); color:var(--wrong-text); font-size:0.75rem; border-radius:20px; padding:2px 10px; margin-left:8px; font-weight:600; }
+
+        /* 【新增】通用操作按钮 */
+        .profile-action { width:100%; padding:14px; border-radius:14px; background:var(--muted); color:var(--text); font-weight:600; text-align:center; margin-top:10px; cursor:pointer; transition:all 0.2s ease; }
+        .profile-action:active { transform:scale(0.98); background:var(--muted-strong); }
+        .profile-action.danger { background:var(--wrong-bg); color:var(--wrong-text); }
+        .profile-action.primary { background:var(--list-new-bg); color:var(--primary); }
+
+        /* 【新增】提醒小时选择 */
+        .hour-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+        .hour-btn { width:36px; height:36px; border-radius:10px; background:var(--muted); color:var(--text); font-weight:600; font-size:0.9rem; transition:all 0.2s ease; }
+        .hour-btn:active { transform:scale(0.92); }
+        .hour-btn.active { background:var(--primary); color:white; }
+
+        /* 深色模式下滚动条和文本域适配 */
+        body[data-theme="dark"] .search-box input { color-scheme: dark; }
+        body[data-theme="dark"] input[type="time"] { color-scheme: dark; }
+
+        /* 记事本 */
+        .note-textarea { width:100%; min-height:42vh; background:var(--card); color:var(--text); border:2px solid var(--input-border); border-radius:14px; padding:14px; font-size:0.95rem; line-height:1.65; font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; resize:vertical; box-sizing:border-box; }
+        .note-textarea::placeholder { color:var(--text-secondary); }
+        .note-textarea:focus { border-color:var(--primary); }
+        .note-toolbar { display:flex; gap:10px; }
+        .note-toolbar button { flex:1; }
+        .btn-danger { background:#EF4444; color:white; padding:10px 16px; border-radius:24px; font-weight:600; }
+        .note-hint { font-size:0.85rem; color:var(--text-secondary); line-height:1.6; }
+        .note-hint code { background:var(--muted); padding:1px 6px; border-radius:6px; font-family:ui-monospace,monospace; font-size:0.8rem; }
+
+        @media (prefers-reduced-motion: reduce) { * { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
+    </style>
+</head>
+<body>
+<div class="loading-bar" id="loadingBar"></div>
+<header><h1>🦉 单词助手</h1><div id="levelTag">全部</div></header>
+<div class="container" id="viewContainer"></div>
+<nav class="nav">
+    <button class="nav-item" data-view="search" onclick="switchView('search')"><span>🔍</span>查词</button>
+    <button class="nav-item" data-view="wordbook" onclick="switchView('wordbook')"><span>📖</span>单词本</button>
+    <button class="nav-item" data-view="review" onclick="switchView('review')"><span>✏️</span>复习</button>
+    <button class="nav-item" data-view="wrong" onclick="switchView('wrong')"><span>📕</span>错题</button>
+    <button class="nav-item" data-view="note" onclick="switchView('note')"><span>📝</span>记事本</button>
+    <button class="nav-item" data-view="profile" onclick="switchView('profile')"><span>👤</span>我的</button>
+</nav>
+<div id="toast"></div>
+
+<div id="selectListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">选择单词表</div><div id="listOptionsContainer"></div><div class="list-new-btn" onclick="hideSelectModal(); createNewList()">+ 新建列表</div><div class="modal-actions" style="margin-top:16px;"><button class="modal-btn modal-btn-cancel" style="width:100%;" onclick="hideSelectModal()">取消</button></div></div></div>
+<div id="customModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">新建列表</div><input type="text" id="newListNameInput" class="modal-input" placeholder="请输入新列表名称" autocomplete="off"><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">取消</button><button class="modal-btn modal-btn-confirm" onclick="confirmCreateList()">确认创建</button></div></div></div>
+<div id="deleteListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">删除列表</div><p style="margin-bottom:20px;">确定删除该列表吗？列表中的单词会自动移入默认列表。</p><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeDeleteModal()">取消</button><button class="modal-btn modal-btn-danger" onclick="performDeleteList()">确认删除</button></div></div></div>
+
+<script>
+    let wordbook = [];
+    let lists = [];
+    let settings = { review_mode: 'learn', dailyLimit: 5, autoLimit: false, level: '全部', weights: {en_zh:40, zh_en:40, spell:20}, autoAdapt: false, theme: 'system', reminder_enabled: false, reminder_time: '09:00' };
+    let currentView = 'search';
+    let noteDirty = false;  // 记事本是否有未保存修改
+    let currentSearchWord = null;
+    let reviewQueue = [];
+    let reviewIndex = 0;
+    let currentQuestion = null;
+    let correctCount = 0;
+    let debounceTimer = null;
+    let currentListId = 1;
+    let reviewListId = 'all';
+    let pendingDeleteListId = null;
+
+    /* 【新增】日历状态 */
+    let currentCalendarDate = new Date();
+    let monthData = {};
+
+    let stats = { en_zh: { correct: 0, wrong: 0 }, zh_en: { correct: 0, wrong: 0 }, spell: { correct: 0, wrong: 0 } };
+    window._currentAnswers = [];
+    window._currentCorrect = '';
+
+    // 获取API基础URL
+    function getApiUrl() {
+        return window.Android ? window.Android.getApiUrl() : 'http://127.0.0.1:5000';
+    }
+
+    /* ---------- 深色模式 ---------- */
+    function applyTheme() {
+        let dark;
+        if (settings.theme === 'dark') {
+            dark = true;
+        } else if (settings.theme === 'light') {
+            dark = false;
+        } else { // system
+            // 优先用原生 API（比 WebView matchMedia 可靠）
+            if (window.Android && window.Android.isSystemDarkMode) {
+                dark = window.Android.isSystemDarkMode();
+            } else {
+                try { dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch(e) { dark = false; }
+            }
+        }
+        document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
+        // 状态栏颜色跟随主题
+        if (window.Android && window.Android.setStatusBarColor) {
+            window.Android.setStatusBarColor(dark ? '#0F172A' : '#F8FAFC');
+        }
+    }
+    function setTheme(mode) {
+        settings.theme = mode;
+        apiPost('/api/config', { theme: mode });
+        applyTheme();
+        // 只切换按钮高亮，不重渲染整个页面（避免整页动画闪烁）
+        document.querySelectorAll('.theme-option').forEach(el => {
+            el.classList.toggle('active', el.dataset.mode === mode);
+        });
+        showToast(mode === 'system' ? '已跟随系统' : (mode === 'dark' ? '已切换深色模式' : '已切换浅色模式'));
+    }
+    // 跟随系统时监听系统主题变化
+    try {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq.addEventListener) mq.addEventListener('change', () => { if (settings.theme === 'system') applyTheme(); });
+        else if (mq.addListener) mq.addListener(() => { if (settings.theme === 'system') applyTheme(); });
+    } catch (e) {}
+
+    /* ---------- 单词发音 ---------- */
+    function speakWord(word) {
+        word = String(word || '').trim();
+        if (!word) return;
+        if (window.Android && window.Android.speak) {
+            window.Android.speak(word);
+        } else {
+            // 开发/兜底：有道词典真人发音
+            try {
+                new Audio('https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(word) + '&type=2').play();
+            } catch (e) {}
+        }
+    }
+
+    /* ---------- 导出 / 导入 ---------- */
+    /* ---------- 导入导出（选择列表） ---------- */
+    // 弹出列表选择器：选择"全部"或某个具体列表
+    async function showListPicker(title, callback) {
+        try {
+            const lists = await apiGet('/api/lists');
+            const opts = ['<div class="modal-option" data-id="all" onclick="window._pickerCallback(\'all\')"><strong>📋 全部列表</strong><span>导出/导入所有数据</span></div>'];
+            lists.forEach(l => {
+                opts.push(`<div class="modal-option" data-id="${l.id}" onclick="window._pickerCallback(${l.id})"><strong>${l.name || '默认列表'}</strong><span>列表 ID: ${l.id}</span></div>`);
+            });
+            const html = `<div class="modal-mask" id="listPickerMask" onclick="if(event.target===this)closeModal()">
+                <div class="modal">
+                    <div class="modal-title">${title} — 选择列表</div>
+                    <div class="modal-options">${opts.join('')}</div>
+                    <button class="modal-btn modal-btn-cancel" style="margin-top:16px;width:100%;" onclick="closeModal()">取消</button>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+            window._pickerCallback = (id) => { closeModal(); callback(id); };
+        } catch (e) { callback(null); }
+    }
+
+    function closeModal() {
+        document.querySelectorAll('.modal-mask').forEach(m => m.remove());
+    }
+
+    async function exportData() {
+        showListPicker('📤 导出', async (listId) => {
+            try {
+                const url = listId && listId !== 'all' ? `/api/export?list_id=${listId}` : '/api/export';
+                const data = await apiGet(url);
+                const json = JSON.stringify(data, null, 2);
+                if (window.Android && window.Android.exportData) {
+                    window.Android.exportData(json);
+                } else {
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'wordassistant-backup-' + new Date().toISOString().slice(0,10) + '.json';
+                    a.click();
+                }
+                showToast('导出成功');
+            } catch (e) { showToast('导出失败'); }
+        });
+    }
+
+    function importData() {
+        showListPicker('📥 导入', (listId) => {
+            window._importTargetListId = (listId && listId !== 'all') ? listId : null;
+            if (window.Android && window.Android.pickImport) {
+                window.Android.pickImport();
+            } else {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => applyImport(reader.result);
+                    reader.readAsText(file);
+                };
+                input.click();
+            }
+        });
+    }
+
+    async function applyImport(jsonText) {
+        try {
+            const data = JSON.parse(jsonText);
+            if (window._importTargetListId) data.target_list_id = window._importTargetListId;
+            const res = await apiPost('/api/import', data);
+            if (res.success) {
+                await loadWordbook();
+                showToast(`导入成功，共 ${res.imported} 个单词`);
+            } else {
+                showToast('导入失败：' + (res.error || '未知错误'));
+            }
+        } catch (e) { showToast('导入失败：文件格式错误'); }
+    }
+
+    /* ---------- 每日学习提醒（整点） ---------- */
+    async function toggleReminder(checked) {
+        settings.reminder_enabled = checked;
+        await apiPost('/api/config', { reminder_enabled: checked ? 'true' : 'false' });
+        const row = document.getElementById('hourRow');
+        if (row) {
+            row.style.opacity = checked ? '' : '0.4';
+            row.style.pointerEvents = checked ? '' : 'none';
+        }
+        applyReminder();
+        showToast(checked ? '已开启每日提醒' : '已关闭每日提醒');
+    }
+    async function changeReminderHour(hour) {
+        settings.reminder_time = String(hour).padStart(2, '0') + ':00';
+        await apiPost('/api/config', { reminder_time: settings.reminder_time });
+        // 只更新当前按钮高亮，不重渲染页面
+        document.querySelectorAll('.hour-btn').forEach(el => {
+            el.classList.toggle('active', parseInt(el.dataset.hour) === hour);
+        });
+        applyReminder();
+        showToast('提醒时间已设为 ' + hour + ' 点');
+    }
+    function applyReminder() {
+        if (window.Android && window.Android.scheduleReminder && settings.reminder_enabled) {
+            const parts = (settings.reminder_time || '09:00').split(':');
+            window.Android.scheduleReminder(parseInt(parts[0]) || 9, parseInt(parts[1]) || 0, true);
+        } else if (window.Android && window.Android.scheduleReminder) {
+            window.Android.scheduleReminder(9, 0, false);
+        }
+    }
+
+    /* ---------- 错题本 ---------- */
+    async function renderWrongBook() {
+        const container = document.getElementById('viewContainer');
+        container.innerHTML = '<div class="card">⏳ 加载错题本...</div>';
+        let wrongList = [];
+        try { wrongList = await apiGet('/api/wordbook/wrong'); } catch(e) {}
+        let html = `<div class="card">
+            <h3>📕 错题本 <small style="color:var(--text-secondary);">共 ${wrongList.length} 个</small></h3>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin:8px 0;">复习中答错/忘记的单词，重点强化</p>`;
+        if (wrongList.length === 0) {
+            html += `<p style="text-align:center;padding:20px;color:var(--text-secondary);">🎉 没有错题，太棒了！</p>`;
+        } else {
+            html += `<div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn-primary" style="flex:1;" onclick="reviewWrongWords()">📖 复习错题</button>
+                <button class="btn-warning" style="flex:1;" onclick="clearAllWrong()">清空标记</button>
+            </div>`;
+            wrongList.forEach(w => {
+                if ((w.word || '').length > 40) return;  // 超长词跳过不显示
+                let reasonHtml = '';
+                if (w.reason === 'forgot') {
+                    reasonHtml = `<div class="wrong-reason" style="font-size:0.85rem;color:#F59E0B;margin-top:4px;">😵 忘记了</div>`;
+                } else if (w.reason === 'wrong') {
+                    reasonHtml = `<div class="wrong-reason" style="font-size:0.82rem;margin-top:4px;">
+                        <div style="color:#EF4444;font-weight:600;margin-bottom:2px;">❌ 答错了</div>
+                        <div style="color:#10B981;">✅ 正确答案：${fmtTrans(w.correct_answer)}</div>
+                        <div style="color:#EF4444;">❌ 你选择了：${fmtTrans(w.selected)}</div>
+                    </div>`;
+                } else {
+                    reasonHtml = `<div class="wrong-reason" style="font-size:0.85rem;color:#F59E0B;margin-top:4px;">😵 忘记了</div>`;
+                }
+                html += `<div class="wrong-item">
+                    <div><span style="font-weight:700;">${w.word}</span><span class="wrong-count">错 ${w.forget_count} 次</span>
+                    <div class="word-trans">${fmtTrans(w.translation)}</div>${reasonHtml}</div>
+                    <button class="speak-btn" onclick="speakWord('${w.word}')">🔊</button>
+                </div>`;
+            });
+        }
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+    async function reviewWrongWords() {
+        // 开始新的错题复习：重置进行中的队列
+        reviewQueue = []; reviewIndex = 0;
+        let wrongList = [];
+        try { wrongList = await apiGet('/api/wordbook/wrong'); } catch(e) {}
+        const words = wrongList.map(w => w.word);
+        if (words.length === 0) { showToast('没有错题可复习'); return; }
+        reviewListId = 'all';
+        currentView = 'review';
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        document.querySelector('[data-view="review"]').classList.add('active');
+        const container = document.getElementById('viewContainer');
+        await renderReview(container);
+        await startReview(words);
+    }
+    async function clearAllWrong() {
+        let wrongList = [];
+        try { wrongList = await apiGet('/api/wordbook/wrong'); } catch(e) {}
+        for (const w of wrongList) {
+            await apiPost(`/api/wordbook/${encodeURIComponent(w.word)}/clear_wrong?list_id=${w.list_id}`);
+        }
+        showToast('已清空错题标记');
+        renderWrongBook();
+    }
+
+    /* ---------- 连续打卡统计 ---------- */
+    async function loadStreak() {
+        try { return await apiGet('/api/streak'); } catch(e) { return { streak: 0, total_days: 0 }; }
+    }
+    
+    /* ---------- 顶部加载进度条 ---------- */
+    let loadingCount = 0, loadingTimer = null;
+    function loadingStart() {
+        loadingCount++;
+        const bar = document.getElementById('loadingBar');
+        if (bar) bar.classList.add('active');
+        if (loadingTimer) { clearTimeout(loadingTimer); loadingTimer = null; }
+    }
+    function loadingEnd() {
+        loadingCount = Math.max(0, loadingCount - 1);
+        if (loadingCount === 0) {
+            if (loadingTimer) clearTimeout(loadingTimer);
+            loadingTimer = setTimeout(() => {
+                const bar = document.getElementById('loadingBar');
+                if (bar) bar.classList.remove('active');
+                loadingTimer = null;
+            }, 280);  // 最小显示 280ms，避免闪烁
+        }
+    }
+
+    // 词性标注格式化：a.→adj.（全局函数，多处使用）
+    function fmtTrans(t) { return (t || '').replace(/(?<=\s|^)a\./g, 'adj.'); }
+
+    async function apiGet(path) {
+        loadingStart();
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const apiUrl = getApiUrl();
+            const res = await fetch(apiUrl + path, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error('请求失败');
+            return await res.json();
+        } catch (e) { throw e; } finally { loadingEnd(); }
+    }
+    async function apiPost(path, data) {
+        loadingStart();
+        try {
+            const apiUrl = getApiUrl();
+            const res = await fetch(apiUrl + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            return await res.json();
+        } catch (e) { throw e; } finally { loadingEnd(); }
+    }
+    async function apiDelete(path) {
+        loadingStart();
+        try {
+            const apiUrl = getApiUrl();
+            const res = await fetch(apiUrl + path, { method: 'DELETE' });
+            return await res.json();
+        } catch (e) { throw e; } finally { loadingEnd(); }
+    }
+
+    function switchView(view) {
+        // 离开记事本时自动保存未保存内容
+        if (currentView === 'note' && view !== 'note' && noteDirty) {
+            const ta = document.getElementById('noteArea');
+            if (ta) apiPost('/api/note', { content: ta.value });
+            noteDirty = false;
+        }
+        currentView = view;
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        renderView(view);
+    }
+
+    /* 通用：淡出后替换内容再淡入（用于内容切换过渡） */
+    async function fadeReplace(el, html) {
+        el.classList.add('fade-out');
+        await new Promise(r => setTimeout(r, 250));
+        el.innerHTML = html;
+        requestAnimationFrame(() => el.classList.remove('fade-out'));
+    }
+
+    async function renderView(view) {
+        const container = document.getElementById('viewContainer');
+        // 淡出 → 切换内容 → 淡入
+        container.classList.add('fade-out');
+        await new Promise(r => setTimeout(r, 250));
+        container.innerHTML = '';
+        if (view === 'search') renderSearch(container);
+        if (view === 'wordbook') await renderWordbook(container);
+        if (view === 'review') await renderReview(container);
+        if (view === 'wrong') await renderWrongBook();
+        if (view === 'note') await renderNote(container);
+        if (view === 'profile') await renderProfile(container);
+        requestAnimationFrame(() => container.classList.remove('fade-out'));
+    }
+
+    // ---------- 记事本 ----------
+    async function renderNote(container) {
+        let content = '';
+        try { const r = await apiGet('/api/note'); content = r.content || ''; } catch (e) {}
+        container.innerHTML = `
+            <div class="card">
+                <h3>📝 记事本</h3>
+                <div class="note-hint" style="margin-top:6px;">粘贴从 AI 复制的单词 JSON 或任意文本，可随时保存、一键导入。</div>
+            </div>
+            <div class="card">
+                <textarea id="noteArea" class="note-textarea" placeholder="在此粘贴或输入内容…（支持直接粘贴 AI 生成的单词 JSON）"></textarea>
+                <div class="note-toolbar" style="margin-top:12px;">
+                    <button class="btn-primary" onclick="saveNote()">💾 保存</button>
+                    <button class="btn-success" onclick="importNote()">📥 一键导入单词本</button>
+                    <button class="btn-danger" onclick="clearNote()">🗑️ 清空</button>
+                </div>
+                <div class="note-hint" style="margin-top:12px;">💡 若内容是含 <code>user_words</code> 的单词 JSON，点「一键导入」即可直接加入单词本。</div>
+            </div>
+        `;
+        // 用 JS 赋值避免 HTML 转义问题
+        const ta = document.getElementById('noteArea');
+        if (ta) ta.value = content;
+        noteDirty = false;
+    }
+
+    function onNoteInput() { noteDirty = true; }
+
+    async function saveNote() {
+        const ta = document.getElementById('noteArea');
+        if (!ta) return;
+        try { await apiPost('/api/note', { content: ta.value }); noteDirty = false; showToast('已保存'); }
+        catch (e) { showToast('保存失败'); }
+    }
+
+    // 清空记事本（确认后清空并保存空内容）
+    function clearNote() {
+        const ta = document.getElementById('noteArea');
+        if (!ta) return;
+        showConfirm('🗑️ 清空记事本', '确定清空记事本的所有内容吗？清空后立即保存，无法恢复。', async () => {
+            ta.value = '';
+            noteDirty = false;
+            try { await apiPost('/api/note', { content: '' }); showToast('已清空'); }
+            catch (e) { showToast('清空失败'); }
+        });
+    }
+
+    async function importNote() {
+        const ta = document.getElementById('noteArea');
+        if (!ta) return;
+        const text = (ta.value || '').trim();
+        if (!text) { showToast('内容为空'); return; }
+        let data;
+        try { data = JSON.parse(text); }
+        catch (e) { showToast('不是合法 JSON，无法导入'); return; }
+        if (!data.user_words || !Array.isArray(data.user_words)) {
+            showToast('JSON 中缺少 user_words 单词数组'); return;
+        }
+        // 复用列表选择器：选"全部"或指定列表后导入
+        showListPicker('📥 导入到', async (listId) => {
+            const payload = Object.assign({}, data);
+            if (listId && listId !== 'all') payload.target_list_id = listId;
+            const res = await apiPost('/api/import', payload);
+            if (res.success) {
+                await loadWordbook();
+                showToast(`导入成功，共 ${res.imported} 个单词`);
+            } else {
+                showToast('导入失败：' + (res.error || '未知错误'));
+            }
+        });
+    }
+
+    // ---------- 搜索页 ----------
+    function renderSearch(container) {
+        container.innerHTML = `
+            <div class="search-wrapper">
+                <div class="search-box">
+                    <span>🔍</span>
+                    <input type="text" id="searchInput" placeholder="输入单词（如 apple）..." autocomplete="off" onblur="hideAutoList()">
+                    <button class="btn-primary" onclick="searchWord()">查词</button>
+                </div>
+                <div class="autocomplete-list" id="autoList"></div>
+            </div>
+            <div id="searchResult"></div>
+        `;
+        document.getElementById('searchInput').addEventListener('input', handleAutoComplete);
+        // 键盘弹出时隐藏导航栏，收起时恢复（避免导航栏被键盘顶上）
+        const nav = document.querySelector('.nav');
+        document.getElementById('searchInput').addEventListener('focus', () => {
+            if (nav) nav.classList.add('nav-hidden');
+        });
+        document.getElementById('searchInput').addEventListener('blur', () => {
+            if (nav) nav.classList.remove('nav-hidden');
+        });
+    }
+
+    async function handleAutoComplete(e) {
+        const word = e.target.value.trim().toLowerCase();
+        const list = document.getElementById('autoList');
+        if (!word) {
+            list.classList.add('collapsed');   // 立即隐藏（跳过动画）
+            list.classList.remove('show');
+            list.innerHTML = '';
+            return;
+        }
+        list.classList.remove('collapsed');    // 恢复动画能力
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            try {
+                const results = await apiGet(`/api/autocomplete?q=${encodeURIComponent(word)}`);
+                if (results.length > 0) {
+                    list.innerHTML = results.map(item => `
+                        <div class="auto-item" onclick="selectSuggestion('${item.word}')">
+                            <div><span class="auto-word">${item.word}</span><span class="auto-phon">${item.phonetic || ''}</span></div>
+                            <div class="auto-desc">${fmtTrans(item.translation) || '暂无释义'}</div>
+                        </div>
+                    `).join('');
+                    list.classList.add('show');
+                } else { list.innerHTML = ''; list.classList.remove('show'); }
+            } catch(e) { list.innerHTML = ''; list.classList.remove('show'); }
+        }, 300);
+    }
+
+    /* 输入框失焦时收起联想栏（延迟 150ms，让 click 先执行，避免抢跑） */
+    function hideAutoList() {
+        setTimeout(() => {
+            const list = document.getElementById('autoList');
+            if (!list) return;
+            list.classList.add('collapsed');
+            list.classList.remove('show');
+            list.innerHTML = '';
+        }, 150);
+    }
+
+    function selectSuggestion(word) {
+        document.getElementById('searchInput').value = word;
+        document.getElementById('autoList').innerHTML = '';
+        document.getElementById('autoList').classList.remove('show');
+        searchWord();
+    }
+
+    async function searchWord() {
+        const input = document.getElementById('searchInput');
+        const word = input.value.trim().toLowerCase();
+        document.getElementById('autoList').innerHTML = '';
+        document.getElementById('autoList').classList.remove('show');
+        input.blur();
+        const resultContainer = document.getElementById('searchResult');
+        resultContainer.innerHTML = '<div class="card">⏳ 查询中...</div>';
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const res = await fetch(getApiUrl() + `/api/search/${word}`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.status === 404) {
+                await fadeReplace(resultContainer, '<div class="card" style="text-align:center;">😕 没有这个单词哦</div>');
+                return;
+            }
+            if (!res.ok) throw new Error('网络错误');
+            const data = await res.json();
+            currentSearchWord = word;
+            const isInBook = wordbook.some(item => item.word === word);
+            await fadeReplace(resultContainer, `
+                <div class="card" id="resultCard">
+                    <h2>${data.word} <button class="speak-btn" onclick="speakWord('${data.word}')">🔊</button> <small style="color:var(--text-secondary)">${data.phonetic}</small></h2>
+                    <p style="color:var(--text-tertiary); margin:8px 0;">${fmtTrans(data.translation)}</p>
+                    <div style="display:flex; gap:8px; margin-top:16px;">
+                        <button id="addBtn" class="btn-primary" onclick="openListModal()">${isInBook ? '✓ 已添加' : '📖 加入单词本'}</button>
+                        <button class="btn-warning" onclick="startImmediateReview('${word}')">⚡ 立即复习</button>
+                    </div>
+                </div>`);
+            if (isInBook) document.getElementById('addBtn').style.background = '#10B981';
+        } catch(e) { await fadeReplace(resultContainer, '<div class="card" style="text-align:center;">网络错误</div>'); }
+    }
+
+    async function openListModal() {
+        if (!currentSearchWord) return;
+        try { lists = await apiGet('/api/lists'); } catch(e) { showToast('加载列表失败'); return; }
+        const container = document.getElementById('listOptionsContainer');
+        container.innerHTML = '';
+        lists.forEach(list => {
+            const btn = document.createElement('div');
+            btn.className = 'list-option';
+            btn.innerHTML = `<span>${list.name}</span><span style="color:var(--text-secondary); font-size:0.9rem;">→</span>`;
+            btn.onclick = () => addToList(list.id);
+            container.appendChild(btn);
+        });
+        const modal = document.getElementById('selectListModal');
+        modal.classList.add('show');
+        modal.style.display = 'flex';
+    }
+
+    function hideSelectModal() { const modal = document.getElementById('selectListModal'); modal.classList.remove('show'); setTimeout(() => { modal.style.display = 'none'; }, 300); }
+
+    async function addToList(listId) {
+        if (!currentSearchWord) return;
+        await apiPost('/api/wordbook', { word: currentSearchWord, list_id: listId });
+        await loadWordbook();
+        const addBtn = document.getElementById('addBtn');
+        if (addBtn) { addBtn.innerText = '✓ 已添加'; addBtn.style.background = '#10B981'; }
+        hideSelectModal();
+        const card = document.getElementById('resultCard');
+        const target = document.querySelector('[data-view="wordbook"]');
+        if (card && target) {
+            const targetRect = target.getBoundingClientRect();
+            const cardRect = card.getBoundingClientRect();
+            const dx = (targetRect.left + targetRect.width / 2) - (cardRect.left + cardRect.width / 2);
+            const dy = (targetRect.top + targetRect.height / 2) - (cardRect.top + cardRect.height / 2);
+            card.animate([{ transform: 'translate(0px, 0px) scale(1)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0 }], { duration: 600, easing: 'cubic-bezier(0.77, 0, 0.175, 1)', fill: 'forwards' });
+            setTimeout(() => { card.style.display = 'none'; showToast('已加入单词本，经验+5'); updateLevelTag(); }, 620);
+        }
+    }
+
+    async function loadWordbook() {
+        lists = await apiGet('/api/lists');
+        const data = await apiGet(`/api/wordbook?list_id=${currentListId}`);
+        wordbook = data.map(item => ({word: item.word, mastered: item.mastered, phonetic: item.phonetic, translation: item.translation}));
+        return wordbook;
+    }
+
+    async function renderWordbook(container) {
+        lists = await apiGet('/api/lists');
+        if (!lists.some(l => l.id === currentListId)) currentListId = 1;
+        let listHtml = `<div class="list-manager">`;
+        lists.forEach(l => {
+            if (l.id === 1) { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${l.name}</div>`; }
+            else { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${l.name}<span style="margin-left:6px;" onclick="event.stopPropagation(); openDeleteModal(${l.id})">×</span></div>`; }
+        });
+        listHtml += `<div class="list-new" onclick="createNewList()">+ 新建列表</div></div>`;
+        await loadWordbook();
+        if (wordbook.length === 0) { container.innerHTML = listHtml + `<div class="card"><h3>📖 当前列表暂无单词</h3><p style="text-align:center;padding:20px;">去搜索页添加吧！</p></div>`; return; }
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        let alphaHtml = `<div class="alphabet-index">`;
+        alphabet.forEach(char => { alphaHtml += `<div class="alpha-btn" onclick="scrollToLetter('${char}')">${char}</div>`; });
+        alphaHtml += `</div>`;
+        let listContent = `<div class="card"><h3>📖 单词本 (<span id="bookCount">${wordbook.length}</span>)</h3>`;
+        let groupedWords = {};
+        for (const item of wordbook) { const letter = item.word.charAt(0).toUpperCase(); if (!groupedWords[letter]) groupedWords[letter] = []; groupedWords[letter].push(item); }
+        for (const letter of alphabet) {
+            if (groupedWords[letter]) {
+                listContent += `<div id="letter-${letter}" class="letter-group-title">${letter}</div>`;
+                for (const item of groupedWords[letter]) {
+                    const word = item.word;
+                    if (word.length > 40) continue;  // 超长词跳过不显示，防止撑破UI
+                    listContent += `<div id="bookItem-${word}" class="word-row"><div class="word-info"><div class="word-main">${word} <button class="speak-btn" onclick="speakWord('${word}')">🔊</button> <span class="word-phon">${item.phonetic || ''}</span> ${item.mastered ? '✅' : ''}</div><div class="word-trans">${fmtTrans(item.translation)}</div></div><button class="del-btn" onclick="removeWordFromBook('${word}')">删除</button></div>`;
+                }
+            }
+        }
+        listContent += `</div>`;
+        container.innerHTML = listHtml + alphaHtml + listContent;
+    }
+
+    async function switchList(listId) { currentListId = listId; apiPost('/api/config', { last_list_id: listId }); await renderView('wordbook'); }
+    function openDeleteModal(listId) { pendingDeleteListId = listId; const modal = document.getElementById('deleteListModal'); modal.classList.add('show'); modal.style.display = 'flex'; }
+    function closeDeleteModal() { pendingDeleteListId = null; const modal = document.getElementById('deleteListModal'); modal.classList.remove('show'); setTimeout(() => { modal.style.display = 'none'; }, 300); }
+    async function performDeleteList() { if (!pendingDeleteListId) return; const listId = pendingDeleteListId; pendingDeleteListId = null; await apiDelete(`/api/lists/${listId}`); currentListId = 1; closeDeleteModal(); await renderView('wordbook'); showToast('列表已删除'); }
+    function createNewList() { const modal = document.getElementById('customModal'); const input = document.getElementById('newListNameInput'); modal.classList.add('show'); modal.style.display = 'flex'; input.value = ''; setTimeout(() => input.focus(), 100); }
+    function closeCustomModal() { const modal = document.getElementById('customModal'); modal.classList.remove('show'); setTimeout(() => { modal.style.display = 'none'; }, 300); }
+    async function confirmCreateList() {
+        const input = document.getElementById('newListNameInput');
+        const name = input.value.trim();
+        if (!name) { input.style.borderColor = '#EF4444'; input.placeholder = '名称不能为空'; setTimeout(() => { input.style.borderColor = '#E2E8F0'; input.placeholder = '请输入新列表名称'; }, 1500); return; }
+        const newList = await apiPost('/api/lists', { name: name });
+        currentListId = newList.id;
+        closeCustomModal();
+        await renderView('wordbook');
+    }
+    async function removeWordFromBook(word) { await apiDelete(`/api/wordbook/${word}?list_id=${currentListId}`); await loadWordbook(); await renderView('wordbook'); showToast('已删除'); }
+    function scrollToLetter(letter) { const elem = document.getElementById(`letter-${letter}`); if (elem) elem.scrollIntoView({ behavior: 'smooth', block: 'start' }); else showToast('没有以 ' + letter + ' 开头的单词'); }
+
+    // ---------- 复习页 ----------
+    async function renderReview(container) {
+        const config = await apiGet('/api/config');
+        settings.review_mode = config.review_mode || 'learn';
+        if (config.weights) settings.weights = JSON.parse(config.weights);
+        if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
+        if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
+        if (config.autoLimit) settings.autoLimit = config.autoLimit === 'true';
+
+        let limit = settings.dailyLimit;
+        if (settings.autoLimit) limit = Math.max(3, Math.min(10, wordbook.length));
+        lists = await apiGet('/api/lists');
+
+        let scopeHtml = `<div style="margin-bottom:16px;"><h4 style="font-size:0.95rem; color:var(--text-secondary); margin-bottom:8px;">选择复习范围</h4><div class="list-manager">`;
+        scopeHtml += `<div class="list-chip ${reviewListId === 'all' ? 'active' : ''}" onclick="setReviewList('all')">全部列表</div>`;
+        lists.forEach(l => { scopeHtml += `<div class="list-chip ${reviewListId === l.id ? 'active' : ''}" onclick="setReviewList(${l.id})">${l.name}</div>`; });
+        scopeHtml += `</div></div>`;
+
+        container.innerHTML = `${scopeHtml}<div class="mode-switch"><button class="mode-btn ${settings.review_mode === 'learn' ? 'active' : ''}" onclick="setMode('learn')">📚 学习模式</button><button class="mode-btn ${settings.review_mode === 'review' ? 'active' : ''}" onclick="setMode('review')">🧠 巩固模式</button></div><div id="planWrapper" class="plan-wrapper"><div class="card"><h3>复习计划</h3><p style="margin-top:8px;">当前每日复习量：<strong>${limit}</strong> 个</p><p style="font-size:0.9rem;color:var(--text-secondary);">答对+2经验，完成复习额外+10</p><button class="btn-primary" style="margin-top:16px; width:100%;" onclick="startReview()">开始今日复习</button></div></div><div id="reviewArea"></div>`;
+
+        // 设置 wrapper 初始 max-height（同步，确保后续collapse有起点）
+        const planW = document.getElementById('planWrapper');
+        if (planW) planW.style.maxHeight = (planW.scrollHeight + 20) + 'px';
+
+        // 有未完成的复习时，自动恢复做题界面（防止切换页面后进度丢失）
+        if (reviewQueue.length > 0 && reviewIndex < reviewQueue.length) {
+            setTimeout(() => {
+                collapsePlanCard();
+                renderCurrentQuestion();
+                showToast('已恢复上次复习进度');
+            }, 80);
+        }
+    }
+
+    async function setReviewList(id) { reviewListId = id; await renderReview(document.getElementById('viewContainer')); }
+    async function setMode(mode) { settings.review_mode = mode; await apiPost('/api/config', { review_mode: mode }); await renderReview(document.getElementById('viewContainer')); }
+
+    function getCurrentWeights() {
+        let w = { en_zh: 40, zh_en: 40, spell: 20 };
+        if (settings.autoAdapt) {
+            let en_zh_err = stats.en_zh.wrong > 0 ? stats.en_zh.wrong / (stats.en_zh.correct + stats.en_zh.wrong) : 0;
+            let zh_en_err = stats.zh_en.wrong > 0 ? stats.zh_en.wrong / (stats.zh_en.correct + stats.zh_en.wrong) : 0;
+            let spell_err = stats.spell.wrong > 0 ? stats.spell.wrong / (stats.spell.correct + stats.spell.wrong) : 0;
+            w.en_zh = Math.max(10, Math.round(en_zh_err * 100));
+            w.zh_en = Math.max(10, Math.round(zh_en_err * 100));
+            w.spell = Math.max(5, Math.round(spell_err * 100));
+            let total = w.en_zh + w.zh_en + w.spell;
+            if (total === 0) { w = { en_zh: 40, zh_en: 40, spell: 20 }; }
+        } else { w = settings.weights; }
+        return w;
+    }
+
+    function buildTasks(words, isLearning) {
+        let pool = [];
+        let w = getCurrentWeights();
+        let total = w.en_zh + w.zh_en + w.spell;
+        words.forEach(word => {
+            if (isLearning) { pool.push({ word, stage: 0 }); pool.push({ word, stage: 1 }); if (Math.random() < 0.1) pool.push({ word, stage: 2 }); }
+            else { if (w.en_zh > 0) pool.push({ word, stage: 0 }); if (w.zh_en > 0) pool.push({ word, stage: 1 }); let spellProb = w.spell / total; if (Math.random() < spellProb) pool.push({ word, stage: 2 }); }
+        });
+        if (isLearning) return pool;
+        let tasksByWord = {};
+        pool.forEach(task => { if (!tasksByWord[task.word]) tasksByWord[task.word] = []; tasksByWord[task.word].push(task); });
+        let result = [];
+        let wordKeys = Object.keys(tasksByWord);
+        while (wordKeys.length > 0) {
+            let anyAdded = false;
+            wordKeys.sort(() => Math.random() - 0.5);
+            for (let word of wordKeys) {
+                let arr = tasksByWord[word];
+                if (arr.length > 0) {
+                    let len = result.length;
+                    if (len >= 1 && result[len-1].word === word) continue;
+                    if (len >= 2 && result[len-2].word === word) continue;
+                    result.push(arr.shift()); anyAdded = true;
+                }
+            }
+            if (!anyAdded) { for (let word of wordKeys) result.push(...tasksByWord[word]); break; }
+            wordKeys = wordKeys.filter(w => tasksByWord[w].length > 0);
+        }
+        return result;
+    }
+
+    /* ---------- 复习进度保存/恢复 ---------- */
+    async function saveReviewProgress() {
+        try {
+            await apiPost('/api/review/progress', {
+                mode: settings.review_mode,
+                list_id: reviewListId,
+                index: reviewIndex,
+                queue: (reviewQueue || []).map(t => ({ word: t.word, stage: t.stage }))
+            });
+        } catch(e) {}
+    }
+    async function clearReviewProgress() {
+        try { await apiPost('/api/review/progress/clear'); } catch(e) {}
+    }
+    async function checkResumeReview() {
+        try {
+            const p = await apiGet('/api/review/progress');
+            if (p && p.queue && Array.isArray(p.queue) && p.queue.length > 0 && p.index < p.queue.length) {
+                showConfirm('⏸️ 有未完成的复习', `上次复习到第 ${p.index + 1}/${p.queue.length} 题（${p.mode === 'learn' ? '学习' : '巩固'}模式），是否继续？`, async () => {
+                    settings.review_mode = p.mode || 'learn';
+                    reviewListId = (p.list_id !== undefined && p.list_id !== null) ? p.list_id : 'all';
+                    await renderView('review');
+                    reviewQueue = p.queue;
+                    reviewIndex = p.index;
+                    correctCount = 0;
+                    collapsePlanCard();
+                    renderCurrentQuestion();
+                });
+            }
+        } catch(e) {}
+    }
+
+    async function startReview(customWords) {
+        // 注意：不再修改 currentListId（防止污染单词本列表）
+        let wordsToReview;
+        if (customWords) { wordsToReview = customWords; }
+        else {
+            if (reviewListId === 'all') { wordsToReview = await apiGet(`/api/review`); }
+            else { wordsToReview = await apiGet(`/api/review?list_id=${reviewListId}`); }
+            if (wordsToReview.length === 0) { wordsToReview = wordbook.filter(item => !item.mastered).map(item => item.word); let limit = settings.dailyLimit; if (settings.autoLimit) limit = Math.max(3, Math.min(10, wordsToReview.length)); wordsToReview = wordsToReview.slice(0, limit); }
+        }
+        if (wordsToReview.length === 0) { showToast('暂无需要复习的单词'); return; }
+        reviewQueue = buildTasks(wordsToReview, settings.review_mode === 'learn');
+        reviewIndex = 0; correctCount = 0;
+        // 收起复习计划卡片，把空间留给做题
+        collapsePlanCard();
+        renderCurrentQuestion();
+    }
+
+    /* 收起复习计划卡片（平滑动画） */
+    function collapsePlanCard() {
+        const w = document.getElementById('planWrapper');
+        if (!w) return;
+        // 如果初始maxHeight未设置，先同步设置当前高度（确保transition有起点）
+        if (!w.style.maxHeight || w.style.maxHeight === 'auto') {
+            w.style.maxHeight = (w.scrollHeight + 20) + 'px';
+            w.offsetHeight; // 强制reflow，确保初始值生效
+        }
+        w.style.maxHeight = '0px';
+        w.style.opacity = '0';
+        w.style.marginBottom = '0';
+        w.style.transform = 'translateY(-16px) scale(0.96)';
+    }
+
+    /* 展开复习计划卡片（平滑动画） */
+    function expandPlanCard() {
+        const w = document.getElementById('planWrapper');
+        if (!w) return;
+        w.style.maxHeight = (w.scrollHeight + 20) + 'px';
+        w.style.opacity = '1';
+        w.style.marginBottom = '';
+        w.style.transform = '';
+    }
+
+    async function renderCurrentQuestion() {
+        const reviewArea = document.getElementById('reviewArea');
+        if (reviewIndex >= reviewQueue.length) { await apiPost('/api/review/finish', {}); clearReviewProgress(); updateLevelTag(); reviewArea.innerHTML = `<div class="card" style="text-align:center;"><h2>🎉 复习完成！</h2><p>答对关卡：${correctCount}</p><p style="font-size:0.9rem;color:var(--text-secondary);">经验+10</p><button class="btn-primary" onclick="renderReview(document.getElementById('viewContainer'))">返回</button></div>`; return; }
+        currentQuestion = reviewQueue[reviewIndex];
+        const word = currentQuestion.word;
+        let data;
+        try { data = await apiGet(`/api/search/${word}`); } catch(e) { reviewIndex++; renderCurrentQuestion(); return; }
+        function extractMeaning(trans) { return trans.replace(/^[a-zA-Z]+\s+(?=[a-z]+\.)/, ''); }
+        let fullTrans = extractMeaning(fmtTrans(data.translation));
+        const stageNames = ['看英选中', '看中选英', '默写'];
+        let html = `<div class="card"><h3 style="margin-bottom:8px;">题目 ${reviewIndex + 1}/${reviewQueue.length} · ${stageNames[currentQuestion.stage]}</h3><div style="text-align:center;margin:20px 0;">`;
+        let allWords = [...wordbook.map(item => item.word)];
+        if (allWords.length < 4) allWords = allWords.concat(['apple', 'book', 'cat', 'dog', 'run', 'tree', 'water', 'school']);
+        async function getZh(w) { try { const d = await apiGet(`/api/search/${w}`); return extractMeaning(fmtTrans(d.translation)); } catch(e) { return ''; } }
+        const trunc = (s, n) => s && s.length > n ? s.slice(0, n - 1) + '…' : s;
+        if (currentQuestion.stage === 0 || currentQuestion.stage === 1) {
+            const isEnglish = currentQuestion.stage === 0;
+            let display, correct, options;
+            if (isEnglish) { display = word; correct = fullTrans; const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); const translatedZhs = await Promise.all(randomWords.map(w => getZh(w))); const filtered = translatedZhs.filter(t => t && t !== correct); while(filtered.length < 3) { const defaults = ['n. 苹果', 'n. 书本', 'n. 老师']; const randomDefault = defaults[Math.floor(Math.random() * defaults.length)]; if (!filtered.includes(randomDefault) && randomDefault !== correct) filtered.push(randomDefault); } options = [...filtered, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
+            else { display = fullTrans; correct = word; const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); options = [...randomWords, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
+            window._currentAnswers = options; window._currentCorrect = correct;
+            html += `<div style="font-size:2rem;margin-bottom:20px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${trunc(display, 40)}${isEnglish ? `<button class="speak-btn" style="font-size:1.3rem;vertical-align:middle;" onclick="speakWord('${word}')">🔊</button>` : ''}</div><p style="color:var(--text-secondary);margin-bottom:16px;">请选择正确${isEnglish ? '中文' : '英文'}释义</p>`;
+            options.forEach((opt, index) => { const isRight = opt === correct ? 'data-correct="true"' : ''; html += `<button class="option" ${isRight} onclick="checkAnswerByIndex(${index}, this)">${trunc(opt, 60)}</button>`; });
+        } else if (currentQuestion.stage === 2) {
+            html += `<div style="font-size:1.2rem;margin-bottom:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">请输入：<strong>${trunc(fullTrans, 80)}</strong></div><input type="text" id="spellInput" readonly style="width:100%;padding:12px;text-align:center;font-size:1.5rem;border-bottom:2px solid var(--primary);margin-bottom:20px; background:transparent;" placeholder="点击下方按键输入"><div class="keyboard">`;
+            ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].forEach(row => {
+                html += `<div class="keyboard-row">`;
+                for (const ch of row) { html += `<div class="key" onclick="typeChar('${ch}')">${ch.toUpperCase()}</div>`; }
+                html += `</div>`;
+            });
+            html += `<div class="keyboard-row"><div class="key" onclick="typeChar('del')">⌫</div><div class="key confirm" onclick="checkSpell()">✓ 确认</div></div></div>`;
+        }
+        html += `<button class="btn-warning" style="width:100%;margin-top:20px;" onclick="handleForgot()">🤔 我忘记了</button></div></div>`;
+        // 简单淡入动画
+        reviewArea.style.opacity = '0';
+        reviewArea.innerHTML = html;
+        requestAnimationFrame(() => { reviewArea.style.opacity = '1'; });
+        currentQuestion.type = currentQuestion.stage === 0 ? 'en_zh' : (currentQuestion.stage === 1 ? 'zh_en' : 'spell');
+        currentQuestion.correct_answer = currentQuestion.stage === 0 ? fullTrans : word;
+        currentQuestion.translation = data.translation;
+        window.typeChar = (char) => { const input = document.getElementById('spellInput'); if (char === 'del') input.value = input.value.slice(0, -1); else if (char === 'space') input.value += ' '; else input.value += char; };
+        window.checkSpell = () => { const input = document.getElementById('spellInput'); if (input.value.toLowerCase() === word) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; setTimeout(nextQuestion, 1000); } };
+        // 保存复习进度（中断后可继续）
+        saveReviewProgress();
+    }
+
+    window.checkAnswerByIndex = (index, el) => {
+        const selected = window._currentAnswers[index]; const correct = window._currentCorrect;
+        if (selected === correct) { el.classList.add('correct'); correctCount++; stats[currentQuestion.type].correct++; apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }); setTimeout(nextQuestion, 600); }
+        else { el.classList.add('wrong'); stats[currentQuestion.type].wrong++; document.querySelectorAll('.option[data-correct="true"]').forEach(b => { b.classList.add('correct'); b.disabled = true; }); apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: selected, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }); setTimeout(nextQuestion, 1500); }
+    };
+
+    async function handleForgot() {
+        if (!currentQuestion) return;
+        const word = currentQuestion.word;
+        stats[currentQuestion.type].wrong++;
+        // 记录到错题本（await + 检查结果）
+        try {
+            const res = await apiPost('/api/review/result', {
+                word: word, list_id: reviewListId, forgot: true,
+                correct_answer: currentQuestion.correct_answer || word,
+                translation: currentQuestion.translation
+            });
+            if (!res.success) { showToast('记录失败：' + (res.error || '未知错误')); }
+        } catch (e) { showToast('记录失败，请重试'); }
+        let extraTasks = [{ word, stage: 0 }, { word, stage: 1 }];
+        if (settings.review_mode === 'review' && Math.random() < 0.3) extraTasks.push({ word, stage: 2 });
+        reviewQueue = reviewQueue.concat(extraTasks);
+        showToast('已加入巩固队列！');
+        reviewIndex++;
+        renderCurrentQuestion();
+    }
+    function nextQuestion() { reviewIndex++; renderCurrentQuestion(); }
+    async function startImmediateReview(word) {
+        // 开始新的单次复习：重置进行中的队列
+        reviewQueue = []; reviewIndex = 0;
+        if (!wordbook.some(item => item.word === word)) { await apiPost('/api/wordbook', { word: word, list_id: currentListId }); await loadWordbook(); }
+        currentView = 'review';
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        document.querySelector('[data-view="review"]').classList.add('active');
+        await renderView('review');
+        await startReview([word]);
+    }
+
+    // ---------- 我的页面（含日历和设置） ----------
+    async function renderProfile(container) {
+        const exp = await apiGet('/api/exp');
+        const expVal = exp.exp || 0;
+        const level = getLevel(expVal);
+        const expPercent = getExpPercent(expVal, level);
+
+        const config = await apiGet('/api/config');
+        settings.review_mode = config.review_mode || 'learn';
+        if (config.weights) settings.weights = JSON.parse(config.weights);
+        if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
+        if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
+        if (config.autoLimit) settings.autoLimit = config.autoLimit === 'true';
+        if (config.theme) settings.theme = config.theme;
+        if (config.reminder_enabled) settings.reminder_enabled = config.reminder_enabled === 'true';
+        if (config.reminder_time) settings.reminder_time = config.reminder_time;
+
+        if (settings.autoAdapt) settings.weights = getCurrentWeights();
+        if (settings.autoLimit) settings.dailyLimit = Math.max(3, Math.min(20, wordbook.length));
+
+        const calendarHtml = renderCalendarHTML();
+        const streak = await loadStreak();
+        // 提醒时段按钮（只到整点，不需要精确到分钟）
+        const reminderHour = parseInt(String(config.reminder_time || '09:00').split(':')[0]) || 9;
+        const hourButtons = [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].map(h =>
+            `<button class="hour-btn ${h===reminderHour?'active':''}" data-hour="${h}" onclick="changeReminderHour(${h})">${h}</button>`
+        ).join('');
+        let wrongCount = 0;
+        try { wrongCount = (await apiGet('/api/wordbook/wrong')).length; } catch(e) {}
+
+        container.innerHTML = `
+            <div class="card level-box">
+                <div class="level-icon">🏆</div>
+                <div class="level-name">Lv.${level}</div>
+                <p style="color:var(--text-secondary);">经验值：${expVal}</p>
+                <div class="exp-bar"><div class="exp-fill" style="width:${expPercent}%;"></div></div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);">距下一级还需 ${getNextLevelExp(expVal, level) - expVal} 经验</p>
+            </div>
+
+            <div class="card" id="calendarCard">
+                <h3>📅 学习日历</h3>
+                ${calendarHtml}
+            </div>
+
+            <div class="card">
+                <h3>📊 学习统计</h3>
+                <div class="stat-row"><span class="stat-label">🔥 连续打卡</span><span class="stat-value">${streak.streak} 天</span></div>
+            </div>
+
+            <div class="card">
+                <h3>复习题型比例</h3>
+                <div class="weight-group">
+                    <div class="weight-row"><span class="weight-label">英 → 中</span><input type="range" class="weight-slider" min="0" max="100" value="${settings.weights.en_zh}" id="w_en_zh" oninput="updateWeights('en_zh', this.value)" ${settings.autoAdapt ? 'disabled' : ''}><span class="weight-value" id="v_en_zh">${settings.weights.en_zh}%</span></div>
+                    <div class="weight-row"><span class="weight-label">中 → 英</span><input type="range" class="weight-slider" min="0" max="100" value="${settings.weights.zh_en}" id="w_zh_en" oninput="updateWeights('zh_en', this.value)" ${settings.autoAdapt ? 'disabled' : ''}><span class="weight-value" id="v_zh_en">${settings.weights.zh_en}%</span></div>
+                    <div class="weight-row"><span class="weight-label">默写</span><input type="range" class="weight-slider" min="0" max="100" value="${settings.weights.spell}" id="w_spell" oninput="updateWeights('spell', this.value)" ${settings.autoAdapt ? 'disabled' : ''}><span class="weight-value" id="v_spell">${settings.weights.spell}%</span></div>
+                    <div class="auto-switch-row"><div><div style="font-weight:bold;">自动适应</div><div class="auto-switch-desc">根据错误率自动调整（需先积累几次复习）</div></div><input type="checkbox" ${settings.autoAdapt ? 'checked' : ''} id="auto_adapt" onchange="toggleAutoAdapt(this.checked)"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>⚙️ 记忆设置</h3>
+                <div style="margin-top:16px;">
+                    <div class="weight-row"><span class="weight-label">每日复习量</span><input type="range" class="weight-slider" min="3" max="20" value="${settings.dailyLimit}" id="dailyLimitSlider" oninput="updateDailyLimit(this.value)" ${settings.autoLimit ? 'disabled' : ''}><span class="weight-value" id="dailyLimitValue">${settings.dailyLimit} 词</span></div>
+                    <div class="auto-switch-row"><div><div style="font-weight:bold;">自动适配</div><div class="auto-switch-desc">根据单词本词量自动调整</div></div><input type="checkbox" ${settings.autoLimit ? 'checked' : ''} id="auto_limit" onchange="toggleAutoLimit(this.checked)"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🎨 外观</h3>
+                <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;">界面主题（布局不变，仅配色）</div>
+                <div class="theme-options">
+                    <div class="theme-option ${settings.theme==='system'?'active':''}" data-mode="system" onclick="setTheme('system')">🌓 跟随系统</div>
+                    <div class="theme-option ${settings.theme==='light'?'active':''}" data-mode="light" onclick="setTheme('light')">☀️ 亮色</div>
+                    <div class="theme-option ${settings.theme==='dark'?'active':''}" data-mode="dark" onclick="setTheme('dark')">🌙 深色</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📕 错题本</h3>
+                <div class="stat-row"><span class="stat-label">待强化单词</span><span class="stat-value">${wrongCount} 个</span></div>
+                <button class="profile-action primary" onclick="renderWrongBook()">查看错题本 →</button>
+            </div>
+
+            <div class="card">
+                <h3>⏰ 每日学习提醒</h3>
+                <div class="auto-switch-row"><div><div style="font-weight:bold;">每日提醒</div><div class="auto-switch-desc">每天整点提醒学习</div></div><input type="checkbox" ${settings.reminder_enabled?'checked':''} id="reminder_check" onchange="toggleReminder(this.checked)"></div>
+                <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:16px;">提醒时段（整点）</div>
+                <div class="hour-row" id="hourRow" style="${settings.reminder_enabled?'':'opacity:0.4;pointer-events:none;'}">${hourButtons}</div>
+            </div>
+
+            <div class="card">
+                <h3>💾 数据管理</h3>
+                <button class="profile-action" onclick="exportData()">📤 导出单词本（备份）</button>
+                <button class="profile-action" onclick="importData()">📥 导入单词本（恢复）</button>
+                <button class="profile-action" style="color:var(--danger,#EF4444);" onclick="clearAllWords()">🗑️ 删除所有单词</button>
+            </div>
+
+            <div class="card" style="text-align:center;"><button class="btn-warning" onclick="resetAll()">⚠️ 重置所有数据</button></div>
+        `;
+
+        // 日历卡片绑定左右滑动
+        bindCalendarSwipe();
+    }
+
+    let calTouchX = 0;
+    function bindCalendarSwipe() {
+        const card = document.getElementById('calendarCard');
+        if (!card || card._swipeBound) return;
+        card._swipeBound = true;
+        card.addEventListener('touchstart', (e) => { calTouchX = e.touches[0].clientX; }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+            const diff = e.changedTouches[0].clientX - calTouchX;
+            if (Math.abs(diff) > 45) changeCalendarMonth(diff < 0 ? 1 : -1);
+        });
+    }
+
+    /* 学习日历渲染逻辑 */
+    function renderCalendarHTML() {
+        const year = currentCalendarDate.getFullYear();
+        const month = currentCalendarDate.getMonth();
+        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+        
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startWeekday = firstDay.getDay(); // 周日是0
+        const daysInMonth = lastDay.getDate();
+        
+        let calendarHtml = `<div class="calendar-controls">
+            <div class="calendar-btn" onclick="changeCalendarMonth(-1)">◀</div>
+            <strong>${year}年${month + 1}月</strong>
+            <div class="calendar-btn" onclick="changeCalendarMonth(1)">▶</div>
+        </div>
+        <div class="calendar-grid">
+            <div class="calendar-weekday">日</div><div class="calendar-weekday">一</div><div class="calendar-weekday">二</div><div class="calendar-weekday">三</div><div class="calendar-weekday">四</div><div class="calendar-weekday">五</div><div class="calendar-weekday">六</div>`;
+        
+        for (let i = 0; i < startWeekday; i++) {
+            calendarHtml += `<div></div>`;
+        }
+        
+        const todayStr = new Date().toISOString().slice(0, 10);
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+            let cls = 'calendar-day';
+            if (dateStr === todayStr) cls += ' today';
+            
+            if (monthData[dateStr]) {
+                if (monthData[dateStr].add > 0 && monthData[dateStr].review > 0) cls += ' both';
+                else if (monthData[dateStr].add > 0) cls += ' added';
+                else if (monthData[dateStr].review > 0) cls += ' reviewed';
+            }
+            calendarHtml += `<div class="${cls}">${day}</div>`;
+        }
+        calendarHtml += `</div>`;
+        return calendarHtml;
+    }
+
+    async function changeCalendarMonth(delta) {
+        const card = document.getElementById('calendarCard');
+        if (!card) return;
+        const current = new Date(currentCalendarDate);
+        current.setMonth(current.getMonth() + delta);
+        currentCalendarDate = current;
+        await loadMonthData();
+        // 淡出 + 滑出
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(' + (-delta * 24) + 'px)';
+        await new Promise(r => setTimeout(r, 180));
+        // 替换内容
+        card.innerHTML = '<h3>📅 学习日历</h3>' + renderCalendarHTML();
+        card.style.transform = 'translateX(' + (delta * 24) + 'px)';
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                card.style.opacity = '1';
+                card.style.transform = '';
+            });
+        });
+    }
+
+    async function loadMonthData() {
+        const year = currentCalendarDate.getFullYear();
+        const month = String(currentCalendarDate.getMonth() + 1).padStart(2, '0');
+        const monthStr = `${year}-${month}`;
+        try {
+            monthData = await apiGet(`/api/study_log/month?month=${monthStr}`);
+        } catch (e) {
+            monthData = {};
+        }
+    }
+
+    function updateWeights(type, value) { settings.weights[type] = parseInt(value); document.getElementById(`v_${type}`).innerText = value + '%'; saveWeights(); }
+    function toggleAutoAdapt(checked) { settings.autoAdapt = checked; if (checked) { settings.weights = getCurrentWeights(); document.getElementById('w_en_zh').value = settings.weights.en_zh; document.getElementById('w_zh_en').value = settings.weights.zh_en; document.getElementById('w_spell').value = settings.weights.spell; document.getElementById('v_en_zh').innerText = settings.weights.en_zh + '%'; document.getElementById('v_zh_en').innerText = settings.weights.zh_en + '%'; document.getElementById('v_spell').innerText = settings.weights.spell + '%'; } applySliderDisable(); saveWeights(); }
+    function applySliderDisable() { document.getElementById('w_en_zh').disabled = settings.autoAdapt; document.getElementById('w_zh_en').disabled = settings.autoAdapt; document.getElementById('w_spell').disabled = settings.autoAdapt; }
+    async function saveWeights() { await apiPost('/api/config', { weights: JSON.stringify(settings.weights), autoAdapt: settings.autoAdapt ? 'true' : 'false' }); showToast('已保存题型设置'); }
+    
+    /* 【修复勾选框核心逻辑】 */
+    async function toggleAutoLimit(checked) {
+        settings.autoLimit = checked;
+        if (checked) {
+            const autoVal = Math.max(3, Math.min(20, wordbook.length));
+            settings.dailyLimit = autoVal;
+            document.getElementById('dailyLimitSlider').value = autoVal;
+            document.getElementById('dailyLimitValue').innerText = autoVal + ' 词';
+        }
+        document.getElementById('dailyLimitSlider').disabled = checked;
+        // await 确保保存完成后再刷新，避免与页面切换的 GET 请求竞态
+        await apiPost('/api/config', { autoLimit: settings.autoLimit ? 'true' : 'false', dailyLimit: settings.dailyLimit });
+        showToast('复习量设置已更新');
+    }
+
+    function updateDailyLimit(value) { settings.dailyLimit = parseInt(value); document.getElementById('dailyLimitValue').innerText = settings.dailyLimit + ' 词'; apiPost('/api/config', { dailyLimit: settings.dailyLimit }); showToast('复习量已更新为 ' + settings.dailyLimit + ' 词'); }
+    function getLevel(exp) { let level = 1; let threshold = 0; let inc = 20; while (exp >= threshold + inc) { threshold += inc; inc += 10; level++; } return level; }
+    function getExpPercent(exp, level) { let threshold = 0, inc = 20; for (let i=1; i<level; i++) { threshold += inc; inc += 10; } return ((exp - threshold) / inc) * 100; }
+    function getNextLevelExp(exp, level) { let threshold = 0, inc = 20; for (let i=1; i<level; i++) { threshold += inc; inc += 10; } return threshold + inc; }
+    async function updateLevelTag() { const exp = await apiGet('/api/exp'); const level = getLevel(exp.exp || 0); document.getElementById('levelTag').innerText = 'Lv.' + level; }
+    function showToast(msg) { const toast = document.getElementById('toast'); toast.innerText = msg; toast.style.opacity = '1'; setTimeout(() => toast.style.opacity = '0', 2000); }
+
+    /* 通用确认弹窗（缩放动画） */
+    function showConfirm(title, msg, onConfirm) {
+        const html = `<div class="modal-mask" onclick="if(event.target===this)closeModal()">
+            <div class="modal">
+                <div class="modal-title">${title}</div>
+                <p style="color:var(--text-secondary);margin-bottom:16px;line-height:1.5;">${msg}</p>
+                <div style="display:flex;gap:10px;">
+                    <button class="modal-btn modal-btn-cancel" style="flex:1;" onclick="closeModal()">取消</button>
+                    <button class="modal-btn modal-btn-confirm" style="flex:1;" onclick="closeModal();window._confirmAction()">确认</button>
+                </div>
+            </div>
+        </div>`;
+        window._confirmAction = onConfirm;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    /* 重置所有数据（清空单词+记录+列表+设置） */
+    function resetAll() {
+        showConfirm('⚠️ 重置所有数据', '将清空所有单词、学习记录、列表和设置，且<strong>无法恢复</strong>！', async () => {
+            try {
+                await apiPost('/api/reset', { mode: 'all' });
+                showToast('已重置所有数据');
+                await boot();
+            } catch (e) { showToast('重置失败'); }
+        });
+    }
+
+    /* 删除所有单词（保留列表、设置、学习记录） */
+    function clearAllWords() {
+        showConfirm('🗑️ 删除所有单词', '将删除单词本中的所有单词，<strong>无法恢复</strong>！列表和设置会保留。', async () => {
+            try {
+                await apiPost('/api/reset', { mode: 'words' });
+                showToast('已删除所有单词');
+                await boot();
+            } catch (e) { showToast('删除失败'); }
+        });
+    }
+
+    async function boot() {
+        const config = await apiGet('/api/config');
+        // 恢复上次打开的单词本列表
+        if (config.last_list_id) { const lid = parseInt(config.last_list_id); if (!isNaN(lid) && lid > 0) currentListId = lid; }
+        await loadWordbook();
+        settings.review_mode = config.review_mode || 'learn';
+        if (config.weights) settings.weights = JSON.parse(config.weights);
+        if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
+        if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
+        if (config.autoLimit) settings.autoLimit = config.autoLimit === 'true';
+        if (config.theme) settings.theme = config.theme;
+        if (config.reminder_enabled) settings.reminder_enabled = config.reminder_enabled === 'true';
+        if (config.reminder_time) settings.reminder_time = config.reminder_time;
+        applyTheme();
+        applyReminder();
+        await updateLevelTag();
+        await loadMonthData();
+        switchView('search');
+        // 检查是否有未完成的复习，提示继续
+        checkResumeReview();
+    }
+
+    boot();
+</script>
+</body>
+</html>

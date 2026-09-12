@@ -1,0 +1,34 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+
+# ===== Android =====
+android-app/.gradle/
+android-app/.idea/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+*.apk
+*.aab
+
+# ===== 大词典文件（完整版由 GitHub Release 提供，CI 自动下载；精简版入库）=====
+简明英汉字典增强版.db
+简明英汉字典增强版.db.bak
+简明英汉字典增强版.db.bak2
+
+# ===== iOS =====
+ios-app/build/
+ios-app/WordAssistant.xcodeproj/
+DerivedData/
+*.xcuserdatad/
+ios-app/WordAssistant/Resources/Data/
+
+# ===== 临时脚本 =====
+_inspect_db.py
+_inspect_db2.py
+_pnginfo.py
+_contract_test.py
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db

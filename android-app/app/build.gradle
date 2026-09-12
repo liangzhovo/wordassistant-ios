@@ -1,0 +1,71 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.chaquo.python'
+}
+
+android {
+    namespace 'com.example.wordassistant'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.wordassistant"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        // Chaquopy 需要的 NDK ABI 配置
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+
+        // Python 依赖（sqlite3 是标准库，无需 pip 安装）
+        python {
+            // 指定主机上用于构建的 Python 3.10（Chaquopy 15.x 不支持 Python 3.13）
+            buildPython "C:/Users/liang/AppData/Local/Programs/Python/Python310/python.exe"
+            pip {
+                install "flask"
+            }
+        }
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Release 签名配置（密码：wordassistant）
+    signingConfigs {
+        release {
+            storeFile file("../wordassistant-release.keystore")
+            storePassword "wordassistant"
+            keyAlias "wordassistant"
+            keyPassword "wordassistant"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

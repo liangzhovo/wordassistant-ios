@@ -1,0 +1,145 @@
+{
+  "app": "WordAssistant",
+  "version": 1,
+  "exported_at": "2026-08-30 10:00:00",
+  "word_lists": [
+    { "id": 1, "name": "七年级上册 Unit 1", "created_at": "2026-08-30 10:00:00" },
+    { "id": 2, "name": "七年级上册 Unit 2", "created_at": "2026-08-30 10:00:00" }
+  ],
+  "user_words": [
+    {
+      "word": "hello",
+      "list_id": 1,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/həˈləʊ/",
+      "translation": "int. 你好；喂",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "morning",
+      "list_id": 1,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈmɔːnɪŋ/",
+      "translation": "n. 早晨，上午",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "student",
+      "list_id": 1,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈstjuːdnt/",
+      "translation": "n. 学生",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "classroom",
+      "list_id": 1,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈklɑːsruːm/",
+      "translation": "n. 教室",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "teacher",
+      "list_id": 1,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈtiːtʃə/",
+      "translation": "n. 教师",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "library",
+      "list_id": 2,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 3,
+      "forget_count": 1,
+      "next_review": "2026-08-31 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈlaɪbrəri/",
+      "translation": "n. 图书馆",
+      "easiness_factor": 2.4,
+      "interval": 2
+    },
+    {
+      "word": "playground",
+      "list_id": 2,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈpleɪɡraʊnd/",
+      "translation": "n. 操场",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "homework",
+      "list_id": 2,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈhəʊmwɜːk/",
+      "translation": "n. 家庭作业",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "subject",
+      "list_id": 2,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈsʌbdʒɪkt/",
+      "translation": "n. 学科，科目",
+      "easiness_factor": 2.5,
+      "interval": 0
+    },
+    {
+      "word": "dictionary",
+      "list_id": 2,
+      "added_date": "2026-08-30 10:00:00",
+      "review_count": 0,
+      "forget_count": 0,
+      "next_review": "2026-08-30 10:00:00",
+      "mastered": 0,
+      "phonetic": "/ˈdɪkʃənri/",
+      "translation": "n. 词典；字典",
+      "easiness_factor": 2.5,
+      "interval": 0
+    }
+  ],
+  "settings": {
+    "theme": "system",
+    "dailyLimit": "20"
+  }
+}

@@ -1,0 +1,42 @@
+name: WordAssistant
+options:
+  bundleIdPrefix: com.wordassistant
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+targets:
+  WordAssistant:
+    type: application
+    platform: iOS
+    sources:
+      - path: WordAssistant
+        excludes:
+          - "Resources/Data"
+          - "Info.plist"
+      # 词典库直接引用 android-app 资产，单一数据源（CI 由 fetch-db.sh 下载到该路径）
+      - path: ../android-app/app/src/main/assets/简明英汉字典增强版.db
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wordassistant.app
+        PRODUCT_NAME: WordAssistant
+        INFOPLIST_FILE: WordAssistant/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.0"
+        ENABLE_BITCODE: "NO"
+        GENERATE_INFOPLIST_FILE: "NO"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+    scheme:
+      testTargets: []
+      gatherCoverageData: false

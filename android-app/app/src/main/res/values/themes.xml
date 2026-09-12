@@ -1,0 +1,20 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.WordAssistant" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color（与 WebView 主色一致） -->
+        <item name="colorPrimary">#4F46E5</item>
+        <item name="colorPrimaryVariant">#4F46E5</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">#10B981</item>
+        <item name="colorOnSecondary">@color/white</item>
+
+        <!-- 消除启动白屏：系统窗口背景与开屏画面同色 -->
+        <item name="android:windowBackground">#4F46E5</item>
+
+        <!-- 状态栏与开屏画面同色，避免出现突兀的色条 -->
+        <item name="android:statusBarColor" tools:targetApi="l">#4F46E5</item>
+        <!-- 深色状态栏配白色文字 -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+</resources>
