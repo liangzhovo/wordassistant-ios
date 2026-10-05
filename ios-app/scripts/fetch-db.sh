@@ -19,11 +19,26 @@ mkdir -p "$(dirname "$TARGET")"
 
 if [ -n "${GITHUB_REPOSITORY:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "[fetch-db] 尝试从 GitHub Release 下载完整词典..."
-  if gh release download "data-v1" \
+  DL_DIR="$(dirname "$TARGET")"
+  # 优先按精确文件名下载；GitHub 上传中文资产名可能被改成 default.db，故再按 *.db 兜底
+  if ! gh release download "data-v1" \
       --pattern "简明英汉字典增强版.db" \
       --repo "$GITHUB_REPOSITORY" \
-      --dir "$(dirname "$TARGET")" 2>/dev/null; then
-    echo "[fetch-db] 完整词典下载成功"
+      --dir "$DL_DIR" 2>/dev/null || [ ! -s "$TARGET" ]; then
+    echo "[fetch-db] 精确文件名未命中，尝试任意 .db 资产..."
+    rm -f "$DL_DIR"/*.db 2>/dev/null || true
+    gh release download "data-v1" \
+        --pattern "*.db" \
+        --repo "$GITHUB_REPOSITORY" \
+        --dir "$DL_DIR" 2>/dev/null || true
+    # 下载到的文件可能叫 default.db，统一改名为目标文件名
+    local_file="$(find "$DL_DIR" -maxdepth 1 -name '*.db' -type f | head -1)"
+    if [ -n "$local_file" ] && [ "$local_file" != "$TARGET" ]; then
+      mv -f "$local_file" "$TARGET"
+    fi
+  fi
+  if [ -s "$TARGET" ]; then
+    echo "[fetch-db] 完整词典就绪"
     ls -lh "$TARGET"
     exit 0
   fi
