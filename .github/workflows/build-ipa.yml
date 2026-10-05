@@ -88,7 +88,10 @@ jobs:
           if gh release view ipa-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload ipa-latest WordAssistant-unsigned.ipa --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create ipa-latest WordAssistant-unsigned.ipa               --repo "$GITHUB_REPOSITORY"               --title "WordAssistant IPA（最新构建，未签名）"               --notes "由 GitHub Actions 自动构建。未签名，需用爱思助手/Sideloadly/AltStore 自签安装。"               --clobber
+            gh release create ipa-latest WordAssistant-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "WordAssistant IPA（最新构建，未签名）" \
+              --notes "由 GitHub Actions 自动构建。未签名，需用爱思助手/Sideloadly/AltStore 自签安装。"
           fi
           gh release view ipa-latest --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' || true
 
