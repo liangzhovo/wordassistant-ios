@@ -45,7 +45,7 @@ enum Utils {
     /// SM-2 间隔重复（对应 Python sm2_update）
     static func sm2Update(ef: Double, interval: Int, correct: Bool) -> (ef: Double, interval: Int) {
         if correct {
-            var newEf = ef + (0.1 - (5 - 4) * (0.08 + (5 - 4) * 0.02))
+            var newEf = ef + (0.1 - (5.0 - 4.0) * (0.08 + (5.0 - 4.0) * 0.02))
             newEf = max(1.3, newEf)
             let newInterval: Int
             if interval == 0 {

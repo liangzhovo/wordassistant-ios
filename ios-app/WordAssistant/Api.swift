@@ -21,61 +21,48 @@ enum Api {
     static func route(method: String, path: String, query: [String: String], body: [String: Any]?) -> APIResponse {
         let comps = path.split(separator: "/").map(String.init)
         do {
-            switch (method, comps) {
-            case ("GET", ["api", "study_log", "month"]):
-                return try studyLogMonth(query)
-            case ("GET", ["api", "lists"]):
-                return try getLists()
-            case ("POST", ["api", "lists"]):
-                return try createList(body)
-            case ("DELETE", ["api", "lists", let id]):
-                return try deleteList(Int(id))
-            case ("GET", ["api", "wordbook"]):
-                return try getWordbook(query)
-            case ("POST", ["api", "wordbook"]):
-                return try addWord(body)
-            case ("DELETE", ["api", "wordbook", let word]):
-                return try deleteWord(word, query)
-            case ("GET", ["api", "review"]):
-                return try getReview(query)
-            case ("POST", ["api", "review", "result"]):
-                return try reviewResult(body)
-            case ("POST", ["api", "review", "finish"]):
-                return try finishReview()
-            case ("POST", ["api", "reset"]):
-                return try resetAll(body)
-            case ("GET", ["api", "wordbook", "wrong"]):
-                return try getWrongWords()
-            case ("POST", ["api", "wordbook", let word, "clear_wrong"]):
-                return try clearWrong(word, query)
-            case ("GET", ["api", "streak"]):
-                return getStreak()
-            case ("GET", ["api", "export"]):
-                return try exportData(query)
-            case ("POST", ["api", "import"]):
-                return try importData(body)
-            case ("GET", ["api", "search", let word]):
-                return try searchWord(word)
-            case ("GET", ["api", "word", "phrases", let word]):
-                return try wordPhrases(word)
-            case ("GET", ["api", "autocomplete"]):
-                return try autocomplete(query)
-            case ("GET", ["api", "exp"]):
-                return try getExp()
-            case ("GET", ["api", "review", "progress"]):
-                return getReviewProgress()
-            case ("POST", ["api", "review", "progress"]):
-                return try saveReviewProgress(body)
-            case ("POST", ["api", "review", "progress", "clear"]):
-                return try clearReviewProgress()
-            case ("GET", ["api", "config"]):
-                return try getConfig()
-            case ("POST", ["api", "config"]):
-                return try saveConfig(body)
-            case ("GET", ["api", "note"]):
-                return try getNote()
-            case ("POST", ["api", "note"]):
-                return try saveNote(body)
+            // 注意：元组里不能嵌数组模式（'let' binding pattern cannot appear in an expression），
+            // 因此先按 method 分支，再对路径数组整体做数组模式匹配。
+            switch method {
+            case "GET":
+                switch comps {
+                case ["api", "study_log", "month"]: return try studyLogMonth(query)
+                case ["api", "lists"]: return try getLists()
+                case ["api", "wordbook"]: return try getWordbook(query)
+                case ["api", "wordbook", "wrong"]: return try getWrongWords()
+                case ["api", "review"]: return try getReview(query)
+                case ["api", "streak"]: return getStreak()
+                case ["api", "export"]: return try exportData(query)
+                case ["api", "exp"]: return try getExp()
+                case ["api", "review", "progress"]: return getReviewProgress()
+                case ["api", "config"]: return try getConfig()
+                case ["api", "note"]: return try getNote()
+                case ["api", "autocomplete"]: return try autocomplete(query)
+                case ["api", "search", let word]: return try searchWord(word)
+                case ["api", "word", "phrases", let word]: return try wordPhrases(word)
+                default: return .notFound
+                }
+            case "POST":
+                switch comps {
+                case ["api", "lists"]: return try createList(body)
+                case ["api", "wordbook"]: return try addWord(body)
+                case ["api", "review", "result"]: return try reviewResult(body)
+                case ["api", "review", "finish"]: return try finishReview()
+                case ["api", "reset"]: return try resetAll(body)
+                case ["api", "review", "progress"]: return try saveReviewProgress(body)
+                case ["api", "review", "progress", "clear"]: return try clearReviewProgress()
+                case ["api", "config"]: return try saveConfig(body)
+                case ["api", "note"]: return try saveNote(body)
+                case ["api", "import"]: return try importData(body)
+                case ["api", "wordbook", let word, "clear_wrong"]: return try clearWrong(word, query)
+                default: return .notFound
+                }
+            case "DELETE":
+                switch comps {
+                case ["api", "lists", let id]: return try deleteList(Int(id))
+                case ["api", "wordbook", let word]: return try deleteWord(word, query)
+                default: return .notFound
+                }
             default:
                 return .notFound
             }
@@ -465,7 +452,7 @@ enum Api {
             "app": "WordAssistant",
             "version": 1,
             "exported_at": Utils.nowString(),
-            "exported_list_id": listId ?? NSNull(),
+            "exported_list_id": (listId as Any?) ?? NSNull(),
             "word_lists": lists,
             "user_words": words,
             "settings": settings
