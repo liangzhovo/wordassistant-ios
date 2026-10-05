@@ -75,8 +75,11 @@ jobs:
           rm -rf build/Payload
           mkdir -p build/Payload
           cp -R "$APP" build/Payload/
-          (cd build/Payload && zip -r -y -X ../../WordAssistant-unsigned.ipa WordAssistant.app)
+          # 标准 IPA 结构：压缩包根必须为 Payload/（否则签名工具报 "No Payload directory"）
+          (cd build && zip -r -y -X ../WordAssistant-unsigned.ipa Payload)
           ls -lh WordAssistant-unsigned.ipa
+          echo "--- 校验 IPA 结构 ---"
+          unzip -l WordAssistant-unsigned.ipa | grep -q "Payload/WordAssistant.app/" && echo "Payload 结构 OK" || { echo "错误: IPA 缺少 Payload/ 目录"; exit 1; }
 
       - name: Upload IPA to GitHub Release (ipa-latest)
         working-directory: ios-app
