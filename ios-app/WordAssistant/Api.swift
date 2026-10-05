@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 
 /// API 响应
 struct APIResponse {
