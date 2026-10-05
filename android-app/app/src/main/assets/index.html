@@ -230,7 +230,7 @@
 
 <div id="selectListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">选择单词表</div><div id="listOptionsContainer"></div><div class="list-new-btn" onclick="hideSelectModal(); createNewList()">+ 新建列表</div><div class="modal-actions" style="margin-top:16px;"><button class="modal-btn modal-btn-cancel" style="width:100%;" onclick="hideSelectModal()">取消</button></div></div></div>
 <div id="customModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">新建列表</div><input type="text" id="newListNameInput" class="modal-input" placeholder="请输入新列表名称" autocomplete="off"><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">取消</button><button class="modal-btn modal-btn-confirm" onclick="confirmCreateList()">确认创建</button></div></div></div>
-<div id="deleteListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">删除列表</div><p style="margin-bottom:20px;">确定删除该列表吗？列表中的单词会自动移入默认列表。</p><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeDeleteModal()">取消</button><button class="modal-btn modal-btn-danger" onclick="performDeleteList()">确认删除</button></div></div></div>
+<div id="deleteListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">删除列表</div><p style="margin-bottom:20px;">确定删除该列表吗？列表中的单词会<strong>一并删除</strong>，无法恢复！</p><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeDeleteModal()">取消</button><button class="modal-btn modal-btn-danger" onclick="performDeleteList()">确认删除</button></div></div></div>
 
 <script>
     let wordbook = [];

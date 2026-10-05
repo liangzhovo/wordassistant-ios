@@ -75,9 +75,11 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    cur.execute("SELECT COUNT(*) FROM word_lists")
-    if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO word_lists (name) VALUES ('默认列表')")
+    # 始终保证默认列表（id=1）存在：即使历史版本误删过，启动时也会自动重建，
+    # 避免"默认列表丢失"或"所有列表被删光"后无法恢复的问题
+    cur.execute("SELECT id FROM word_lists WHERE id = 1")
+    if not cur.fetchone():
+        cur.execute("INSERT OR IGNORE INTO word_lists (id, name) VALUES (1, '默认列表')")
 
     conn.execute('''
         CREATE TABLE IF NOT EXISTS settings (
@@ -252,8 +254,12 @@ def delete_list(list_id):
     if list_id == 1:
         conn.close()
         return jsonify({'error': '默认列表不能删除'}), 400
-    cur.execute("DELETE FROM user_words WHERE list_id = ? AND word IN (SELECT word FROM user_words WHERE list_id = 1)", (list_id,))
-    cur.execute("UPDATE user_words SET list_id = 1 WHERE list_id = ?", (list_id,))
+    # 至少保留一个列表，防止全部列表被删光后默认列表 id 漂移
+    cur.execute("SELECT COUNT(*) FROM word_lists")
+    if cur.fetchone()[0] <= 1:
+        conn.close()
+        return jsonify({'error': '至少保留一个列表'}), 400
+    cur.execute("DELETE FROM user_words WHERE list_id = ?", (list_id,))
     cur.execute("DELETE FROM word_lists WHERE id = ?", (list_id,))
     conn.commit()
     conn.close()

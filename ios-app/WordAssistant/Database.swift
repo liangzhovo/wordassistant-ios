@@ -167,9 +167,11 @@ enum DB {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        let listCount = query(db, "SELECT COUNT(*) AS c FROM word_lists").first?["c"] as? Int ?? 0
-        if listCount == 0 {
-            try exec(db, "INSERT INTO word_lists (name) VALUES (?)", ["默认列表"])
+        // 始终保证默认列表（id=1）存在：即使历史版本误删过，启动时也会自动重建，
+        // 避免"默认列表丢失"或"所有列表被删光"后无法恢复的问题
+        let hasDefaultList = query(db, "SELECT id FROM word_lists WHERE id = 1").count > 0
+        if !hasDefaultList {
+            try exec(db, "INSERT OR IGNORE INTO word_lists (id, name) VALUES (1, '默认列表')")
         }
 
         try exec(db, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")

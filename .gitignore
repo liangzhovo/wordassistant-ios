@@ -32,3 +32,6 @@ _contract_test.py
 # ===== 系统 =====
 .DS_Store
 Thumbs.db
+
+# ===== 本地 gh 状态 =====
+.local/

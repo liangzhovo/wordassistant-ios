@@ -159,10 +159,12 @@ enum Api {
         }
         let db = try openDB()
         defer { sqlite3_close(db) }
-        try DB.exec(db, """
-            DELETE FROM user_words WHERE list_id = ? AND word IN (SELECT word FROM user_words WHERE list_id = 1)
-        """, [listId])
-        try DB.exec(db, "UPDATE user_words SET list_id = 1 WHERE list_id = ?", [listId])
+        // 至少保留一个列表，防止全部列表被删光后默认列表 id 漂移
+        let listCount = DB.query(db, "SELECT COUNT(*) AS c FROM word_lists").first?["c"] as? Int ?? 0
+        if listCount <= 1 {
+            return .error(400, "至少保留一个列表")
+        }
+        try DB.exec(db, "DELETE FROM user_words WHERE list_id = ?", [listId])
         try DB.exec(db, "DELETE FROM word_lists WHERE id = ?", [listId])
         return .json(["success": true])
     }
