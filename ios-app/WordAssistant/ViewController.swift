@@ -28,7 +28,7 @@ enum JS {
       function patch(){
         if(!document.head) return;
         var st = document.createElement('style');
-        st.textContent = 'header{padding-top:calc(16px + env(safe-area-inset-top)) !important;} .container{padding-bottom:calc(96px + env(safe-area-inset-bottom)) !important;}';
+        st.textContent = 'header{padding-top:calc(16px + env(safe-area-inset-top)) !important;} .nav{padding-bottom:calc(12px + env(safe-area-inset-bottom)) !important;} .container{padding-bottom:calc(96px + env(safe-area-inset-bottom)) !important;}';
         document.head.appendChild(st);
       }
       if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', patch); } else { patch(); }
@@ -70,6 +70,12 @@ final class ViewController: UIViewController, WKScriptMessageHandler, WKNavigati
         webView.uiDelegate = self
         webView.isOpaque = false
         webView.backgroundColor = .clear
+        // 锁定缩放：禁止双指/双击放大（配合 viewport user-scalable=no）
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.maximumZoomScale = 1.0
+        if let pinch = webView.scrollView.pinchGestureRecognizer {
+            pinch.isEnabled = false
+        }
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
         NSLayoutConstraint.activate([
@@ -169,6 +175,8 @@ final class ViewController: UIViewController, WKScriptMessageHandler, WKNavigati
         let b = Double(v & 0xFF) / 255.0
         let luminance = 0.299 * r + 0.587 * g + 0.114 * b
         statusBarDark = luminance >= 0.5
+        // 原生背景跟随主题：透明 webview 未覆盖区域（状态栏/Home 条）不再是紫色
+        view.backgroundColor = UIColor(red: r, green: g, blue: b, alpha: 1)
         setNeedsStatusBarAppearanceUpdate()
     }
 

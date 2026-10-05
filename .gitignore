@@ -24,6 +24,10 @@ DerivedData/
 ios-app/WordAssistant/Resources/Data/
 
 # ===== 临时脚本 =====
+_diag_*.py
+diag*.txt
+rebuild*.txt
+*.db.small.new
 _inspect_db.py
 _inspect_db2.py
 _pnginfo.py
