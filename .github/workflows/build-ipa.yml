@@ -9,7 +9,7 @@ on:
       - '.github/workflows/build-ipa.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-ipa:
@@ -77,6 +77,20 @@ jobs:
           cp -R "$APP" build/Payload/
           (cd build/Payload && zip -r -y -X ../../WordAssistant-unsigned.ipa WordAssistant.app)
           ls -lh WordAssistant-unsigned.ipa
+
+      - name: Upload IPA to GitHub Release (ipa-latest)
+        working-directory: ios-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # 上传到固定标签 ipa-latest，网页端/Release 链接下载很快；失败不阻断（仍有 Artifact）
+          if gh release view ipa-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload ipa-latest WordAssistant-unsigned.ipa --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create ipa-latest WordAssistant-unsigned.ipa               --repo "$GITHUB_REPOSITORY"               --title "WordAssistant IPA（最新构建，未签名）"               --notes "由 GitHub Actions 自动构建。未签名，需用爱思助手/Sideloadly/AltStore 自签安装。"               --clobber
+          fi
+          gh release view ipa-latest --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' || true
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
