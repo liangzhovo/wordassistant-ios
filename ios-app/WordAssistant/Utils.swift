@@ -7,34 +7,46 @@ enum Utils {
     /// 清洗释义（对应 Python clean_paraphrase）
     static func cleanParaphrase(_ text: String?) -> (phonetic: String, translation: String) {
         guard let t = text, !t.isEmpty else { return ("", "") }
-        let stripped = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 精简库释义已以词性开头，直接返回，防止二次切割丢失词性
-        if stripped.range(of: posRegex, options: [.regularExpression, .anchored]) != nil {
-            return ("", stripped)
+        func cleanPos(_ line: String) -> String {
+            line.replacingOccurrences(of: "^a\\.\\s+", with: "adj. ", options: [.regularExpression, .anchored])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        var s = t
-        s = s.replacingOccurrences(of: "-K\\d+\\s*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "-\\d+\\s*", with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: "`1`", with: "")
-        s = s.replacingOccurrences(of: "`2`", with: "")
-        s = s.replacingOccurrences(of: "`3`", with: "")
-        s = s.replacingOccurrences(of: "`4`", with: "")
-        s = s.replacingOccurrences(of: "</br>", with: "；")
-
-        var phonetic = ""
+        // 新格式（ECDICT 学生版）：[音标]词性. 释义（每行一个词性组，首行为最常用义项）
         if let m = s.range(of: "\\[(.*?)\\]", options: .regularExpression) {
             let sub = String(s[m])
+            let phonetic = sub.count >= 2 ? String(sub.dropFirst().dropLast()) : ""
+            let rest = s.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let first = rest.split(separator: "\n").first.map(String.init) ?? rest
+            return (phonetic, cleanPos(first))
+        }
+        if s.range(of: posRegex, options: [.regularExpression, .anchored]) != nil {
+            let first = s.split(separator: "\n").first.map(String.init) ?? s
+            return ("", cleanPos(first))
+        }
+
+        // 旧 MDX 格式兜底（历史库）：原清洗流程
+        var o = t
+        o = o.replacingOccurrences(of: "-K\\d+\\s*", with: "", options: .regularExpression)
+        o = o.replacingOccurrences(of: "-\\d+\\s*", with: "", options: .regularExpression)
+        o = o.replacingOccurrences(of: "`1`", with: "").replacingOccurrences(of: "`2`", with: "")
+        o = o.replacingOccurrences(of: "`3`", with: "").replacingOccurrences(of: "`4`", with: "")
+        o = o.replacingOccurrences(of: "</br>", with: "；")
+
+        var phonetic = ""
+        if let m = o.range(of: "\\[(.*?)\\]", options: .regularExpression) {
+            let sub = String(o[m])
             if sub.count >= 2 {
                 phonetic = String(sub.dropFirst().dropLast())
             }
         }
-        s = s.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+        o = o.replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
 
-        var first = s.components(separatedBy: "；")[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        var first = o.components(separatedBy: "；")[0].trimmingCharacters(in: .whitespacesAndNewlines)
         first = first.replacingOccurrences(of: "^a\\.\\s+", with: "adj. ", options: [.regularExpression, .anchored])
-
         let parts = first.split(separator: " ", maxSplits: 1).map(String.init)
         if parts.count > 1 {
             first = parts[1]

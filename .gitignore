@@ -29,6 +29,10 @@ _inspect_db2.py
 _pnginfo.py
 _contract_test.py
 
+# ===== 构建产物 =====
+dist/
+*.db.new
+
 # ===== 系统 =====
 .DS_Store
 Thumbs.db

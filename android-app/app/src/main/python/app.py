@@ -200,11 +200,21 @@ def get_study_log_month():
 # 清洗释义
 def clean_paraphrase(text):
     if not text: return {'phonetic': '', 'translation': ''}
-    
-    # 【核心修复】如果是精简库（已经以 n. v. adj. 开头），直接返回，防止二次切割丢失词性
-    if re.match(r'^(n|v|vt|vi|adj|adv|prep|pron|conj|interj|num|art|aux)\.', text.strip()):
-        return {'phonetic': '', 'translation': text.strip()}
-        
+    s = text.strip()
+
+    def _clean_pos(t):
+        return re.sub(r'^a\.\s+', 'adj. ', t.strip())
+
+    # 新格式（ECDICT 学生版）：[音标]词性. 释义（每行一个词性组，首行为最常用义项）
+    m = re.search(r'\[(.*?)\]', s)
+    if m:
+        phonetic = m.group(1)
+        rest = re.sub(r'\[.*?\]', '', s).strip()
+        return {'phonetic': phonetic, 'translation': _clean_pos(rest.split('\n')[0])}
+    if re.match(r'^(n|v|vt|vi|adj|adv|prep|pron|conj|interj|num|art|aux)\.', s):
+        return {'phonetic': '', 'translation': _clean_pos(s.split('\n')[0])}
+
+    # 旧 MDX 格式兜底（历史库）：原清洗流程
     text = re.sub(r'-K\d+\s*', '', text)
     text = re.sub(r'-\d+\s*', '', text)
     text = text.replace('`1`','').replace('`2`','').replace('`3`','').replace('`4`','').replace('</br>','；')
@@ -217,10 +227,7 @@ def clean_paraphrase(text):
     first = re.sub(r'^a\.\s+', 'adj. ', first)
     parts = first.split(' ', 1)
     if len(parts) > 1:
-        if re.match(r'^(n|v|vt|vi|adj|adv|prep|pron|conj|interj|num|art|aux)\.', parts[1]):
-            first = parts[1]
-        else:
-            first = parts[1]
+        first = parts[1]
     return {'phonetic': phonetic, 'translation': first}
 
 # 列表 API
