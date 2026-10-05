@@ -111,8 +111,8 @@ def fmt_paraphrase(phonetic, translation, pos_str):
         lines.append(ln)
     for ln in untagged:
         lines.append(ln)
-    if len(lines) <= 1:
-        return None
+    if not tagged and not untagged:
+        return None          # 没有任何释义行（如只有 [音标] 或纯空）才丢弃
     return '\n'.join(lines)
 
 
@@ -160,11 +160,10 @@ def build(src, db_path, only_core=False, expand_exchange=False):
             return 'zk' in tag or (row.get('oxford') or '').strip() == '1'
 
     t0 = time.time()
-    n = meta_n = 0
-    var_n = 0
+    n = meta_n = var_n = 0
+    rows_all = []          # 第一遍：先收集全部原词（含释义）
     with open(src, encoding='utf-8', newline='') as f:
         reader = csv.DictReader(f)
-        batch = []
         for row in reader:
             word = (row.get('word') or '').strip()
             if not word:
@@ -175,28 +174,52 @@ def build(src, db_path, only_core=False, expand_exchange=False):
             para = fmt_paraphrase(phonetic, (row.get('translation') or '').strip(), (row.get('pos') or '').strip())
             if para is None:
                 continue
-            batch.append((word, para))
+            rows_all.append((word, para))
             cur.execute('INSERT OR IGNORE INTO ecdict_meta VALUES (?,?,?,?,?,?,?,?,?)',
                         (word, phonetic, (row.get('pos') or '').strip(),
                          (row.get('collins') or '').strip(), (row.get('oxford') or '').strip(),
                          (row.get('tag') or '').strip(), safe_int(row.get('bnc')),
                          safe_int(row.get('frq')), (row.get('exchange') or '').strip()))
             meta_n += 1
-            n += 1
-            if expand_exchange:
-                for var, orig, typ in exchange_entries(word, (row.get('exchange') or '').strip()):
-                    head = VAR_TYPE_HEAD.get(typ, '')
-                    var_para = para + '\n' + head + orig + ' 的' + EXCHANGE_LABEL.get(typ, '变体')
-                    batch.append((var, var_para))
-                    var_n += 1
-            if len(batch) >= 5000:
-                cur.executemany('INSERT INTO mdx VALUES (?,?)', batch)
-                batch = []
-                conn.commit()
-                sys.stdout.write(f'\r  已写入 {n} 词条 (变体 {var_n})  {time.time()-t0:.0f}s')
-                sys.stdout.flush()
-        if batch:
+    # 第二遍：先插全部原词（原词优先，避免变体覆盖），再插变体
+    seen = set()
+    batch = []
+    for word, para in rows_all:
+        wkey = word.lower()
+        if wkey in seen:
+            continue
+        batch.append((word, para))
+        seen.add(wkey)
+        n += 1
+        if len(batch) >= 5000:
             cur.executemany('INSERT INTO mdx VALUES (?,?)', batch)
+            batch = []
+            conn.commit()
+            sys.stdout.write(f'\r  原词 {n}   {time.time()-t0:.0f}s')
+            sys.stdout.flush()
+    if batch:
+        cur.executemany('INSERT INTO mdx VALUES (?,?)', batch)
+        conn.commit()
+    if expand_exchange:
+        vbatch = []
+        # 从 ecdict_meta 读取 exchange，为每个原词补充变体条目（原词已优先插入）
+        for (word, exchange, para) in cur.execute(
+                "SELECT m2.word, m2.exchange, m1.paraphrase FROM ecdict_meta m2 JOIN mdx m1 ON m1.entry = m2.word COLLATE NOCASE").fetchall():
+            for var, orig, typ in exchange_entries(word, exchange):
+                vkey = var.lower()
+                if vkey in seen:
+                    continue              # 原词已存在，保留原词条
+                head = VAR_TYPE_HEAD.get(typ, '')
+                var_para = para + '\n' + head + orig + ' 的' + EXCHANGE_LABEL.get(typ, '变体')
+                vbatch.append((var, var_para))
+                seen.add(vkey)
+                var_n += 1
+                if len(vbatch) >= 5000:
+                    cur.executemany('INSERT INTO mdx VALUES (?,?)', vbatch)
+                    vbatch = []
+                    conn.commit()
+        if vbatch:
+            cur.executemany('INSERT INTO mdx VALUES (?,?)', vbatch)
             conn.commit()
     cur.execute('ANALYZE')
     conn.commit()
@@ -208,6 +231,39 @@ def build(src, db_path, only_core=False, expand_exchange=False):
     return rows
 
 
+def build_textbook_fallback(db_path, textbook_jsons):
+    """教材词兜底：把 7上/8上/9上 JSON 里的词强制补入（ECDICT 缺失时用教材自带音标释义）。"""
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    added = 0
+    seen = {r[0].lower() for r in cur.execute('SELECT entry FROM mdx')}
+    for jf in textbook_jsons:
+        if not os.path.exists(jf):
+            continue
+        import json as _json
+        with open(jf, encoding='utf-8') as f:
+            data = _json.load(f)
+        for w in data.get('user_words', []):
+            word = (w.get('word') or '').strip().lower()
+            if not word or word in seen:
+                continue
+            phonetic = (w.get('phonetic') or '').strip()
+            translation = (w.get('translation') or '').strip()
+            if not translation:
+                continue
+            lines = []
+            if phonetic:
+                lines.append('[' + phonetic + ']')
+            lines.append(translation)
+            cur.execute('INSERT INTO mdx (entry, paraphrase) VALUES (?,?)', (word, '\n'.join(lines)))
+            seen.add(word)
+            added += 1
+    conn.commit()
+    conn.close()
+    print(f'教材词兜底补充: {added} 个')
+    return added
+
+
 if __name__ == '__main__':
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.environ.get('TEMP', ''), 'ecdict.csv')
     print('数据源:', src, '存在:', os.path.exists(src))
@@ -217,3 +273,7 @@ if __name__ == '__main__':
     build(src, FULL, only_core=False, expand_exchange=True)
     print('\n===== 构建精简版（中考+牛津三千）=====')
     build(src, SMALL, only_core=True, expand_exchange=False)
+    print('\n===== 教材词兜底（完整版 + 精简版）=====')
+    textbook_jsons = [os.path.join(ROOT, f) for f in ['7上.json', '8上.json', '9上.json']]
+    build_textbook_fallback(FULL, textbook_jsons)
+    build_textbook_fallback(SMALL, textbook_jsons)

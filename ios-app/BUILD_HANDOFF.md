@@ -1,61 +1,82 @@
-# 🦉 单词助手 · iOS 构建交接说明（ECDICT 学生版词库）
+# 🦉 单词助手 · iOS 构建交接说明（ECDICT 学生版词库 · v2 修复版）
 
 > **给负责构建 iOS 的 AI / 开发者**
-> 本文档说明：词典数据源已更换，iOS 构建前需要**上传哪些文件**、**按什么顺序构建**、**如何验证**。
-> 请先通读，再执行构建。
+> 本文档说明：词典数据源已更换为 **ECDICT 学生版 v2 修复版**，iOS 构建前需要**上传哪些文件**、**按什么顺序构建**、**如何验证**。
+> ⚠️ **请先通读第 1、3 节**——v2 修复了一个会导致「搜不到单词」的构建 bug，**必须使用 v2 词典重新上传与构建**，不要沿用之前上传的旧版词典。
 
 ---
 
-## 1. 本次变更：词典数据源更换
+## 1. ⚠️ 重要：本次词典必须是 v2 修复版
 
-| 项目 | 旧（已废弃） | 新（当前） |
+上一版（v1：43.5 MB / 301,182 词条）存在**构建期 bug**：
+
+- 所有「**无音标的单行释义**」词条被误丢弃 → 大量**词组**（`a few`、`get up`、`look after`、`according to`）和常用词（`laptop`、`website`、`importantly`）**搜不到**（搜索提示"没有这个单词"）；
+- **变体词条覆盖原词**（`went` 曾显示 `go` 的音标/释义）。
+
+**v2 已修复（当前工作区即为 v2）**：
+
+| 指标 | v1（废弃） | **v2（当前）** |
 |---|---|---|
-| 数据源 | 简明英汉字典增强版（MDX 转换版，332 万词条） | **ECDICT**（76 万词条，含中考/高考/牛津三千标签、BNC/当代词频、词形变化） |
-| 释义格式 | MDX 标记（`` `1` ``、`</br>`、`[计]` 学科标签、冷门义项在前） | **干净格式**：`[音标] 词性. 释义`（每行一个词性组，首行为最常用义项） |
-| 典型查询结果 | `good → n. 善行, 好处, 利益`（冷门） | `good → adj. 好的`（学生友好） |
-| 词条覆盖 | 332 万（含大量地名/人名/领域术语） | 约 76 万 + 词形变化展开（学习场景完全覆盖） |
+| 完整版词条数 | 301,182 | **768,999**（77 万，重复 0）|
+| 完整版大小 | 43.5 MB | **103.27 MB** |
+| 教材词汇覆盖 | 465 / 472 | **472 / 472**（含 `upcycle` 等 ECDICT 未收录词，已用教材 JSON 兜底）|
+| 词组（a few / get up …）| ❌ 搜不到 | ✅ 可查 |
+| 词形变化 | went → go 的音标（错误）| ✅ `went → [went] go的过去式` |
+| 释义质量 | `good → adj. 好的` 等已优化 | 保持（常见词性优先 + 义项数启发）|
 
-**文件名保持不变**（`简明英汉字典增强版.db` / `.db.small`），**只是内容换源**。因此 iOS 代码（`Database.swift` 的 bootstrap、`SchemeHandler.swift` 的 API 路由）**不需要改动**，仅 `Utils.swift` 的释义清洗逻辑已同步适配新格式（`ios-app/WordAssistant/Utils.swift` 已更新）。
+**一句话：如果 Release `data-v1` 里存的是旧版完整词典，必须用 v2 覆盖，否则 iOS 上会出现"搜不到词组/部分单词"。**
 
 ---
 
 ## 2. 词典文件（构建前必须就位）
 
-三端共用一份数据，位置在：
+三端共用一份数据，位置为（**文件名不变，内容已换源**）：
 
 | 文件 | 内容 | 用途 | 是否入库 |
 |---|---|---|---|
-| `android-app/app/src/main/assets/简明英汉字典增强版.db` | **ECDICT 全量：301,182 词条（23.9 万原词 + 6.2 万词形变化变体），43.5 MB** | iOS 主词典 / 桌面 / Android | ❌ 太大，由 Release 提供 |
-| `android-app/app/src/main/assets/简明英汉字典增强版.db.small` | **学生核心：3,541 词条（中考 zk + 牛津三千 oxford），0.7 MB** | CI 回退 / Android 精简 | ✅ 随仓库提交 |
+| `android-app/app/src/main/assets/简明英汉字典增强版.db` | **ECDICT v2 完整版：768,999 词条 / 103.27 MB** | iOS 主词典 / 桌面 / Android | ❌ 太大，由 Release 提供 |
+| `android-app/app/src/main/assets/简明英汉字典增强版.db.small` | **学生核心：3,758 词条（中考 zk + 牛津三千 + 教材兜底）/ 0.72 MB** | CI 回退 / Android 精简 | ✅ 随仓库提交 |
 
-> 均由仓库根目录 `build_ecdict_dict.py` 从 `ecdict.csv` 构建（释义按"常见词性优先 + 义项数启发"排好序）。
+> 均由仓库根目录 `build_ecdict_dict.py` 从 `ecdict.csv` 构建（两遍法：原词优先插入、变体去重补充 + 教材词兜底）。
 
 ---
 
-## 3. 上传要求（重要）
+## 3. 上传要求（必须在构建前完成）
 
-`ios-app/scripts/fetch-db.sh` 的优先级不变：
-**本地 assets 已有完整版 → 直接从 GitHub Release 下载 → 回退精简库（.small）**。
+`ios-app/scripts/fetch-db.sh` 优先级不变：**本地 assets 已有完整版 → GitHub Release（data-v1）下载 → 回退精简库（.small）**。
 
 因此构建前二选一：
 
-- **方式 A（CI / GitHub Actions）**：先把新完整版上传到 Release，再触发工作流：
+- **方式 A（CI / GitHub Actions，推荐）**：把 v2 完整版上传到 Release **覆盖旧版**，再触发工作流：
   ```bash
-  gh release upload data-v1 "android-app/app/src/main/assets/简明英汉字典增强版.db" --clobber
+  node upload-db.js
+  # 等价于：
+  # gh release upload data-v1 "android-app/app/src/main/assets/简明英汉字典增强版.db" --clobber
   ```
-  或直接运行仓库根目录的现成脚本：`node upload-db.js`（自动取 git 凭据、建 release、上传）。
-  CI 的 `fetch-db.sh` 会自动下载。若未上传，CI 将自动回退到精简库（功能一致，仅覆盖核心词）。
+  上传后可用 `gh release view data-v1` 确认 asset 大小应为 **103 MB 级**（若是 43 MB 级则还是旧版，需重传）。
+  若未上传，CI 将自动回退到精简库（功能一致，仅覆盖核心词与教材词）。
 
-- **方式 B（本地 Mac）**：确保上面 `assets/简明英汉字典增强版.db` 已存在（本地下载/拷贝），直接：
+- **方式 B（本地 Mac）**：确保上面 `assets/简明英汉字典增强版.db` 已存在（下载 v2 或本地拷贝），直接：
   ```bash
-  bash ios-app/scripts/fetch-db.sh        # 会使用本地完整版
+  bash ios-app/scripts/fetch-db.sh        # 使用本地 v2 完整版
   brew install xcodegen
   cd ios-app && xcodegen generate
   ```
 
 ---
 
-## 4. 构建命令（不变）
+## 4. 代码与仓库状态（重要）
+
+- **释义清洗已对齐**：`app.py`（桌面/Android 共用后端）与 `ios-app/WordAssistant/Utils.swift` 的 `cleanParaphrase` 已适配新格式（`[音标]词性. 释义`，首行最常用义项），已随提交 `99de2c7` 入库，**iOS 无需再改代码**。
+- **iOS 其余代码无需改动**：`Database.swift` 的 bootstrap、`SchemeHandler.swift` 的 API 路由、`Api.swift` 均不依赖旧格式。
+- **请确认这两个文件已提交/推送**（当前工作区为最新 v2 版本）：
+  - `android-app/app/src/main/assets/简明英汉字典增强版.db.small`（757,760 bytes）
+  - `build_ecdict_dict.py`（两遍法 + 教材兜底）
+- 若从全新 clone 构建：先 `git pull` 拿到上面两个文件 → 再执行第 3 节上传 → 构建。
+
+---
+
+## 5. 构建命令
 
 ```bash
 cd ios-app
@@ -69,42 +90,45 @@ xcodebuild archive \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 ```
 
-产出 `WordAssistant-unsigned.ipa`（未签名），打包方式见 `.github/workflows/build-ipa.yml`。
+产出 `WordAssistant-unsigned.ipa`（未签名），打包/上传流程见 `.github/workflows/build-ipa.yml`（含 IPA 上传到 GitHub Release `ipa-latest`）。
 
 ---
 
-## 5. 验证清单
+## 6. 验证清单
 
-构建完成后请逐项确认：
+构建完成后请逐项确认（重点：⚠️ 带 **v2 专项** 标记的项是修复验证）：
 
 1. **archive 成功**，`WordAssistant.app` 存在，IPA 打包成功；
-2. **词典文件就位**：`WordAssistant.app/简明英汉字典增强版.db` 存在且非 0 字节（构建日志可查 `ls -lh`）；
-3. **模拟器/真机启动**：首次启动会复制词典并建索引（新库小，初始化明显更快）；
-4. **释义展示**：搜索 `good`、`run`、`about`、`apple`——
-   - 音标正常（如 `good → [gud]`）；
-   - 释义为首个常用义项（如 `good → adj. 好的`，不再出现 `n. 善行` 之类冷门义项）；
-   - 无 MDX 标记（无 `` `1` ``、`</br>`、`[计]` 残留）；
-5. **词形变化**：查 `ran`、`running`、`took` 等变体词能命中（完整版已展开变体）；
-6. **功能回归**：生词本添加、SM-2 复习、错题本、打卡、导出导入、每日提醒均正常。
+2. **词典就位**：`WordAssistant.app/简明英汉字典增强版.db` 存在且大小 **≈103 MB**（若是 43 MB 则打包的是旧版）；
+3. **模拟器/真机启动**：首次启动复制词典并建索引（103 MB 库初始化更快）；
+4. **释义展示**：搜 `good` → `[gud] adj. 好的…`；`run` → `vi. 跑…`；`apple` → `n. 苹果, 家伙`；无 MDX 标记残留；
+5. ⚠️ **v2 专项：词组可查**：搜 `a few`、`get up`、`look after`、`according to` 均能出结果（v1 会提示"没有这个单词"）；
+6. ⚠️ **v2 专项：常见词完整**：搜 `laptop`、`website`、`importantly`、`role model`（如教材有）均能命中；
+7. ⚠️ **v2 专项：变体音标正确**：搜 `went` → `[went] go的过去式`（音标是 went 自己的，不是 go 的）；`took` → `[tuk] take的过去式`；`ran` → `[ræn] run的过去式`；
+8. ⚠️ **v2 专项：教材词全覆盖**：抽查 `upcycle`（教材 9 上词，ECDICT 未收录，由兜底补入）能命中；
+9. **功能回归**：生词本添加、SM-2 复习、错题本、打卡、导出导入、每日提醒均正常。
 
 ---
 
-## 6. 注意事项
+## 7. 注意事项
 
-- 完整版词典（约百余 MB）**不要直接 push 到仓库**（超 GitHub 仓库大小限制），走 Release（`data-v1`）；
-- `.db.small`（学生核心，几 MB）**已随仓库提交**，push 时正常携带；
-- 若 `Utils.swift` / `Api.swift` 与 `app.py` 行为出现偏差，以 `app.py`（桌面/Android 共用后端）为准对齐；
-- 前端 `ios-app/WordAssistant/Resources/index.html` 由 `ios-app/scripts/make_index.py` 从 `android-app/app/src/main/assets/index.html` 生成（POST body 走 query、去除 lookbehind），**每次前端改动后需重新生成并提交**。
+- 完整版词典（103 MB）**不要直接 push 到仓库**（超 GitHub 仓库大小限制），走 Release（`data-v1`）；
+- `.db.small`（学生核心，0.72 MB）**随仓库提交**，push 时正常携带；
+- **上传 data-v1 必须 `--clobber` 覆盖**（`node upload-db.js` 已内置），避免 CI 下载到旧 v1；
+- 若 `Utils.swift` / `Api.swift` 与 `app.py` 行为出现偏差，以 `app.py` 为准对齐；
+- 前端 `ios-app/WordAssistant/Resources/index.html` 由 `ios-app/scripts/make_index.py` 从 `android-app/app/src/main/assets/index.html` 生成（POST body 走 query、去除 lookbehind 正则），**每次前端改动后需重新生成并提交**；
+- 词典由 `build_ecdict_dict.py` 从 `ecdict.csv`（ECDICT 原始数据，63 MB，见 [ECDICT 仓库](https://github.com/skywind3000/ECDICT)）可复现重建。
 
 ---
 
-## 7. 相关文件索引
+## 8. 相关文件索引
 
 | 文件 | 说明 |
 |---|---|
-| `build_ecdict_dict.py` | 从 `ecdict.csv` 构建完整版 + 精简版词典库（仓库根目录） |
-| `ecdict.csv` | ECDICT 原始数据（63MB，不在仓库内，见 [ECDICT 仓库](https://github.com/skywind3000/ECDICT)） |
-| `app.py` / `android-app/.../python/app.py` | 后端释义清洗已适配新格式 |
-| `ios-app/WordAssistant/Utils.swift` | iOS 释义清洗已适配新格式 |
+| `build_ecdict_dict.py` | 从 `ecdict.csv` 构建 v2 完整版 + 精简版（两遍法 + 教材兜底） |
+| `upload-db.js` | 一键上传完整版到 GitHub Release `data-v1`（`--clobber` 覆盖） |
+| `ecdict.csv` | ECDICT 原始数据（63 MB，不在仓库内） |
+| `app.py` / `android-app/.../python/app.py` | 后端释义清洗，已对齐新格式（提交 `99de2c7`） |
+| `ios-app/WordAssistant/Utils.swift` | iOS 释义清洗，已对齐新格式（提交 `99de2c7`） |
 | `ios-app/scripts/fetch-db.sh` | 词典准备脚本（未改动） |
-| `.github/workflows/build-ipa.yml` | CI 构建工作流（未改动） |
+| `.github/workflows/build-ipa.yml` | CI 构建 + IPA 上传 Release（含 IPA 打包修复） |
