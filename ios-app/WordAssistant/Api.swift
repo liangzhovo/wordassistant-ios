@@ -21,54 +21,46 @@ enum Api {
     static func route(method: String, path: String, query: [String: String], body: [String: Any]?) -> APIResponse {
         let comps = path.split(separator: "/").map(String.init)
         do {
-            // 注意：元组里不能嵌数组模式（'let' binding pattern cannot appear in an expression），
-            // 因此先按 method 分支，再对路径数组整体做数组模式匹配。
+            // Swift 的数组模式不支持元素 let 绑定（'let' binding pattern cannot appear in an expression），
+            // 因此这里用显式下标/相等比较来路由，行为与 Python app.py 一致。
             switch method {
             case "GET":
-                switch comps {
-                case ["api", "study_log", "month"]: return try studyLogMonth(query)
-                case ["api", "lists"]: return try getLists()
-                case ["api", "wordbook"]: return try getWordbook(query)
-                case ["api", "wordbook", "wrong"]: return try getWrongWords()
-                case ["api", "review"]: return try getReview(query)
-                case ["api", "streak"]: return getStreak()
-                case ["api", "export"]: return try exportData(query)
-                case ["api", "exp"]: return try getExp()
-                case ["api", "review", "progress"]: return getReviewProgress()
-                case ["api", "config"]: return try getConfig()
-                case ["api", "note"]: return try getNote()
-                case ["api", "autocomplete"]: return try autocomplete(query)
-                case ["api", "search", let word]: return try searchWord(word)
-                case ["api", "word", "phrases", let word]: return try wordPhrases(word)
-                default: return .notFound
-                }
+                if comps == ["api", "study_log", "month"] { return try studyLogMonth(query) }
+                if comps == ["api", "lists"] { return try getLists() }
+                if comps == ["api", "wordbook"] { return try getWordbook(query) }
+                if comps == ["api", "wordbook", "wrong"] { return try getWrongWords() }
+                if comps == ["api", "review"] { return try getReview(query) }
+                if comps == ["api", "streak"] { return getStreak() }
+                if comps == ["api", "export"] { return try exportData(query) }
+                if comps == ["api", "exp"] { return try getExp() }
+                if comps == ["api", "review", "progress"] { return getReviewProgress() }
+                if comps == ["api", "config"] { return try getConfig() }
+                if comps == ["api", "note"] { return try getNote() }
+                if comps == ["api", "autocomplete"] { return try autocomplete(query) }
+                if comps.count == 3, comps[0] == "api", comps[1] == "search" { return try searchWord(comps[2]) }
+                if comps.count == 4, comps[0] == "api", comps[1] == "word", comps[2] == "phrases" { return try wordPhrases(comps[3]) }
             case "POST":
-                switch comps {
-                case ["api", "lists"]: return try createList(body)
-                case ["api", "wordbook"]: return try addWord(body)
-                case ["api", "review", "result"]: return try reviewResult(body)
-                case ["api", "review", "finish"]: return try finishReview()
-                case ["api", "reset"]: return try resetAll(body)
-                case ["api", "review", "progress"]: return try saveReviewProgress(body)
-                case ["api", "review", "progress", "clear"]: return try clearReviewProgress()
-                case ["api", "config"]: return try saveConfig(body)
-                case ["api", "note"]: return try saveNote(body)
-                case ["api", "import"]: return try importData(body)
-                case ["api", "wordbook", let word, "clear_wrong"]: return try clearWrong(word, query)
-                default: return .notFound
-                }
+                if comps == ["api", "lists"] { return try createList(body) }
+                if comps == ["api", "wordbook"] { return try addWord(body) }
+                if comps == ["api", "review", "result"] { return try reviewResult(body) }
+                if comps == ["api", "review", "finish"] { return try finishReview() }
+                if comps == ["api", "reset"] { return try resetAll(body) }
+                if comps == ["api", "review", "progress"] { return try saveReviewProgress(body) }
+                if comps == ["api", "review", "progress", "clear"] { return try clearReviewProgress() }
+                if comps == ["api", "config"] { return try saveConfig(body) }
+                if comps == ["api", "note"] { return try saveNote(body) }
+                if comps == ["api", "import"] { return try importData(body) }
+                if comps.count == 4, comps[0] == "api", comps[1] == "wordbook", comps[3] == "clear_wrong" { return try clearWrong(comps[2], query) }
             case "DELETE":
-                switch comps {
-                case ["api", "lists", let id]: return try deleteList(Int(id))
-                case ["api", "wordbook", let word]: return try deleteWord(word, query)
-                default: return .notFound
-                }
+                if comps.count == 3, comps[0] == "api", comps[1] == "lists" { return try deleteList(Int(comps[2])) }
+                if comps.count == 3, comps[0] == "api", comps[1] == "wordbook" { return try deleteWord(comps[2], query) }
             default:
-                return .notFound
+                break
             }
         } catch {
             return .error(500, "\(error)")
         }
+        return .notFound
     }
 
     // MARK: - 工具
