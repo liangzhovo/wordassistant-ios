@@ -63,6 +63,13 @@ ios-app/
 
 ---
 
+> **构建流水线注意**（已内置在 `.github/workflows/build-ipa.yml` / `ios-app/scripts/fetch-db.sh`）：
+> - XcodeGen 2.46 默认生成 Xcode 16 的工程格式（objectVersion 77），runner 默认 Xcode 15.4 读不了。
+>   工作流在 `xcodegen generate` 后用 perl 把 `objectVersion` 强制改为 56（Xcode 14+ 全兼容）。
+> - GitHub 上传中文资产名时可能被改成 `default.db`，`fetch-db.sh` 已按 `*.db` 兜底下载并改名为
+>   `简明英汉字典增强版.db`，所以 Release 资产名不影响构建。
+> - 完整词典由 Release `data-v1` 提供（当前资产约 466MB）；未上传时自动回退仓库内 82MB 精简库（功能一致）。
+
 ## 安装到 iPhone（无开发者账号）
 
 未签名 IPA **不能直接安装**到普通 iPhone。任选其一：

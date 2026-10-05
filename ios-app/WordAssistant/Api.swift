@@ -172,8 +172,8 @@ enum Api {
                     item["phonetic"] = d.phonetic
                     item["translation"] = d.translation
                     let listId = item["list_id"] as? Int ?? 1
-                    try? DB.exec(db, "UPDATE user_words SET phonetic=?, translation=? WHERE word=? AND list_id=?",
-                                 [d.phonetic, d.translation, item["word"] ?? "", listId])
+                    _ = try? DB.exec(db, "UPDATE user_words SET phonetic=?, translation=? WHERE word=? AND list_id=?",
+                                      [d.phonetic, d.translation, item["word"] ?? "", listId])
                 }
             }
             result.append(item)
@@ -370,15 +370,11 @@ enum Api {
     static func getWrongWords() throws -> APIResponse {
         let db = try openDB()
         defer { sqlite3_close(db) }
+        // wrong_book 表在 initSchema 中始终创建，无需旧表回退
         var result: [[String: Any]] = []
-        do {
-            for var d in DB.query(db, "SELECT * FROM wrong_book ORDER BY last_wrong DESC, wrong_count DESC") {
-                d["forget_count"] = d["wrong_count"] ?? 1
-                result.append(d)
-            }
-        } catch {
-            // 表不存在（旧版本）退回旧查询
-            result = DB.query(db, "SELECT * FROM user_words WHERE forget_count > 0 ORDER BY forget_count DESC, word ASC")
+        for var d in DB.query(db, "SELECT * FROM wrong_book ORDER BY last_wrong DESC, wrong_count DESC") {
+            d["forget_count"] = d["wrong_count"] ?? 1
+            result.append(d)
         }
         return .json(result)
     }
