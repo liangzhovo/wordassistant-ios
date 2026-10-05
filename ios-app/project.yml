@@ -4,6 +4,9 @@ options:
   deploymentTarget:
     iOS: "15.0"
   createIntermediateGroups: true
+  # 强制使用旧版工程格式（objectVersion 56 / Xcode 14+ 可读）。
+  # 否则 XcodeGen 2.46 默认生成 Xcode 16 格式 (77)，runner 上旧版 xcodebuild 打不开。
+  objectVersion: "56"
 configs:
   Debug: debug
   Release: release

@@ -35,6 +35,12 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Diagnose Xcode environment
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          ls /Applications | grep -i xcode || true
+
       - name: Generate Xcode project
         working-directory: ios-app
         run: xcodegen generate
