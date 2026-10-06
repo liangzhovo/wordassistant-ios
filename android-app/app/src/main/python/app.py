@@ -203,7 +203,9 @@ def clean_paraphrase(text):
     s = text.strip()
 
     def _clean_pos(t):
-        return re.sub(r'^a\.\s+', 'adj. ', t.strip())
+        s = re.sub(r'^a\.\s+', 'adj. ', t.strip())
+        s = re.sub(r'\[reference:[^\]]*\]', '', s).strip()
+        return s
 
     # 新格式（ECDICT 学生版）：[音标]词性. 释义（每行一个词性组，首行为最常用义项）
     m = re.search(r'\[(.*?)\]', s)

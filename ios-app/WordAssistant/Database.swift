@@ -121,13 +121,41 @@ enum DB {
         try fm.createDirectory(at: support, withIntermediateDirectories: true, attributes: nil)
         let dest = support.appendingPathComponent("简明英汉字典增强版.db")
         dbPath = dest.path
+        // 修复：App Support 里已有的旧库可能是空库/损坏库（早期版本无内置词典时
+        // 由 SQLITE_OPEN_CREATE 创建的空文件，或拷贝中断的半成品）。
+        // 之前"文件存在即跳过拷贝"会导致永远用坏库 → 搜索全部 404"没有这个单词"。
+        // 现在：存在但词典无效（mdx 表缺失或为空）→ 删除并重新从内置词典拷贝。
+        if fm.fileExists(atPath: dest.path) && !isValidDictionary(at: dest.path) {
+            print("[DB] 检测到无效词典，重新拷贝内置完整版")
+            try? fm.removeItem(at: dest)
+        }
         if !fm.fileExists(atPath: dest.path) {
-            guard let src = Bundle.main.url(forResource: "简明英汉字典增强版", withExtension: "db") else {
+            // 真机实测：Bundle.main.url(forResource:"简明英汉字典增强版", withExtension:"db")
+            // 对中文资源名的精确查找会 miss（资源明明在 bundle 里），导致初始化立即失败、
+            // App Support 只剩空库 → 所有搜索 404"没有这个单词"。因此先精确名，再枚举兜底：
+            // 按扩展名枚举 bundle 内所有 .db 资源（不依赖文件名匹配），取第一个（排除 .small）。
+            let src: URL
+            if let exact = Bundle.main.url(forResource: "简明英汉字典增强版", withExtension: "db") {
+                src = exact
+            } else if let found = Bundle.main.urls(forResourcesWithExtension: "db", subdirectory: nil)?.first(where: { !$0.lastPathComponent.contains(".small") }) {
+                print("[DB] 精确名未命中，枚举得到内置词典: \(found.lastPathComponent)")
+                src = found
+            } else {
                 throw NSError(domain: "DB", code: 2, userInfo: [NSLocalizedDescriptionKey: "内置词典文件缺失"])
             }
             try fm.copyItem(at: src, to: dest)
         }
         try initSchema()
+    }
+
+    /// 校验词典库有效：mdx 表存在且非空（词典缺失/损坏时返回 false，触发重新拷贝）
+    static func isValidDictionary(at path: String) -> Bool {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else { return false }
+        defer { sqlite3_close(db) }
+        let rows = query(db, "SELECT COUNT(*) AS c FROM mdx")
+        guard let first = rows.first, let c = first["c"] as? Int else { return false }
+        return c > 0
     }
 
     static func initSchema() throws {

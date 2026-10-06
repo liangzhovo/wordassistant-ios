@@ -24,6 +24,8 @@ DerivedData/
 ios-app/WordAssistant/Resources/Data/
 
 # ===== 临时脚本 =====
+ipanames.txt
+olddb.txt
 _diag_*.py
 diag*.txt
 rebuild*.txt

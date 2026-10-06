@@ -10,8 +10,10 @@ enum Utils {
         let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
 
         func cleanPos(_ line: String) -> String {
-            line.replacingOccurrences(of: "^a\\.\\s+", with: "adj. ", options: [.regularExpression, .anchored])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            var l = line.replacingOccurrences(of: "^a\\.\\s+", with: "adj. ", options: [.regularExpression, .anchored])
+            // 去掉教材兜底词条里的 [reference:xxx] 残留标记（如 upcycle 的 [reference:101]）
+            l = l.replacingOccurrences(of: "\\[reference:[^\\]]*\\]", with: "", options: .regularExpression)
+            return l.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // 新格式（ECDICT 学生版）：[音标]词性. 释义（每行一个词性组，首行为最常用义项）

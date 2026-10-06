@@ -53,6 +53,7 @@
   # 等价于：
   # gh release upload data-v1 "android-app/app/src/main/assets/简明英汉字典增强版.db" --clobber
   ```
+  ⚠️ **注意资产命名**：GitHub 会把中文文件名自动改成 `default.db`——这是正常现象，**不要改 asset 名字，也不要因此迷惑**；`ios-app/scripts/fetch-db.sh`（提交 `f04aea7`）已支持按 `*.db` 兜底下载并改名为目标文件名。
   上传后可用 `gh release view data-v1` 确认 asset 大小应为 **103 MB 级**（若是 43 MB 级则还是旧版，需重传）。
   若未上传，CI 将自动回退到精简库（功能一致，仅覆盖核心词与教材词）。
 
@@ -67,12 +68,17 @@
 
 ## 4. 代码与仓库状态（重要）
 
-- **释义清洗已对齐**：`app.py`（桌面/Android 共用后端）与 `ios-app/WordAssistant/Utils.swift` 的 `cleanParaphrase` 已适配新格式（`[音标]词性. 释义`，首行最常用义项），已随提交 `99de2c7` 入库，**iOS 无需再改代码**。
-- **iOS 其余代码无需改动**：`Database.swift` 的 bootstrap、`SchemeHandler.swift` 的 API 路由、`Api.swift` 均不依赖旧格式。
+- **释义清洗已对齐**：`app.py`（桌面/Android 共用后端）与 `ios-app/WordAssistant/Utils.swift` 的 `cleanParaphrase` 已适配新格式（`[音标]词性. 释义`，首行最常用义项），已随提交 `99de2c7` 入库。
+- **⚠️ iOS 搜索全 404 的根因已确诊（真机实测），修复在 `Database.swift`（工作区待提交），必须随下个 IPA 发布**：
+  - **根因**：`bootstrap()` 里 `Bundle.main.url(forResource: "简明英汉字典增强版", withExtension: "db")` **对中文资源名的精确查找在真机上 miss**（词典明明在 bundle 里，大小 103.2MB 已验证）。`url(forResource:)` 返回 nil → 抛错「内置词典文件缺失」→ 被 viewDidLoad 的 `catch { print }` 静默吞掉 → **App Support 里只剩 SQLITE_OPEN_CREATE 建的空库**（无 `mdx` 表）→ 所有搜索/联想返回 404「没有这个单词哦」；
+  - **诊断特征**（用户真机）：启动画面（紫色"正在初始化词典…"）**一闪而过**（拷贝未发生）；任意词（含 `apple`）搜不到；但底部导航仍可手动进入搜索页（boot 失败不阻断 UI）；
+  - **修复 A（已写入工作区）**：查找兜底——精确名 miss 时用 `Bundle.main.urls(forResourcesWithExtension: "db", subdirectory: nil)` 枚举所有 `.db` 资源（排除 `.small`）取第一个，再拷贝；
+  - **后备方案 B（若枚举仍 miss）**：打包阶段改用 **ASCII 文件名**（如 `dict.db`）——CI 在构建前把词典复制为 `ios-app/WordAssistant/Resources/dict.db`，`project.yml` 引用该 ASCII 资源，`Database.swift` 同步改名为 `dict.db`（彻底规避中文资源名问题）；
+  - **发布后必须验证**：模拟器/真机安装 → 首次启动画面应**停留数秒~数十秒**（正在拷贝 103MB）→ 搜 `apple`/`good`/`a few` 均命中；已装旧 IPA 的用户需卸载重装（或新版本自动触发坏库重拷，`isValidDictionary(at:)` 已在工作区）。
 - **请确认这两个文件已提交/推送**（当前工作区为最新 v2 版本）：
   - `android-app/app/src/main/assets/简明英汉字典增强版.db.small`（757,760 bytes）
   - `build_ecdict_dict.py`（两遍法 + 教材兜底）
-- 若从全新 clone 构建：先 `git pull` 拿到上面两个文件 → 再执行第 3 节上传 → 构建。
+- 若从全新 clone 构建：先 `git pull` 拿到上面文件（含 `Database.swift` 修复）→ 再执行第 3 节上传 → 构建。
 
 ---
 
@@ -113,6 +119,7 @@ xcodebuild archive \
 ## 7. 注意事项
 
 - 完整版词典（103 MB）**不要直接 push 到仓库**（超 GitHub 仓库大小限制），走 Release（`data-v1`）；
+- **data-v1 必须保留 v2 完整版资产**（GitHub 会存成名字 `default.db`，103.2 MB 即为 v2；`fetch-db.sh` 已兼容，无需改名）；不要删除或替换为旧版，否则 iOS 会回退精简版导致大量单词搜不到；
 - `.db.small`（学生核心，0.72 MB）**随仓库提交**，push 时正常携带；
 - **上传 data-v1 必须 `--clobber` 覆盖**（`node upload-db.js` 已内置），避免 CI 下载到旧 v1；
 - 若 `Utils.swift` / `Api.swift` 与 `app.py` 行为出现偏差，以 `app.py` 为准对齐；
@@ -130,5 +137,5 @@ xcodebuild archive \
 | `ecdict.csv` | ECDICT 原始数据（63 MB，不在仓库内） |
 | `app.py` / `android-app/.../python/app.py` | 后端释义清洗，已对齐新格式（提交 `99de2c7`） |
 | `ios-app/WordAssistant/Utils.swift` | iOS 释义清洗，已对齐新格式（提交 `99de2c7`） |
-| `ios-app/scripts/fetch-db.sh` | 词典准备脚本（未改动） |
+| `ios-app/scripts/fetch-db.sh` | 词典准备脚本（已更新，提交 `f04aea7`：支持 GitHub 把中文资产名改为 `default.db` 的情况，按 `*.db` 兜底下载并改名） |
 | `.github/workflows/build-ipa.yml` | CI 构建 + IPA 上传 Release（含 IPA 打包修复） |
