@@ -233,6 +233,19 @@
 <div id="deleteListModal" class="modal-overlay"><div class="modal-content"><div class="modal-title">删除列表</div><p style="margin-bottom:20px;">确定删除该列表吗？列表中的单词会<strong>一并删除</strong>，无法恢复！</p><div class="modal-actions"><button class="modal-btn modal-btn-cancel" onclick="closeDeleteModal()">取消</button><button class="modal-btn modal-btn-danger" onclick="performDeleteList()">确认删除</button></div></div></div>
 
 <script>
+    /* 搜索页名言 */
+    const FAMOUS_QUOTES = [{"q":"The only way to do great work is to love what you do.","a":"Steve Jobs"},{"q":"Stay hungry, stay foolish.","a":"Steve Jobs"},{"q":"The future belongs to those who believe in the beauty of their dreams.","a":"Eleanor Roosevelt"},{"q":"It always seems impossible until it's done.","a":"Nelson Mandela"},{"q":"Success is not final, failure is not fatal: it is the courage to continue that counts.","a":"Winston Churchill"},{"q":"Do not go where the path may lead, go instead where there is no path and leave a trail.","a":"Ralph Waldo Emerson"},{"q":"Act as if what you do makes a difference. It does.","a":"William James"},{"q":"The best way to predict the future is to invent it.","a":"Alan Kay"},{"q":"Life is what happens when you're busy making other plans.","a":"John Lennon"},{"q":"You miss 100% of the shots you don't take.","a":"Wayne Gretzky"},{"q":"The journey of a thousand miles begins with a single step.","a":"Lao Tzu"},{"q":"Well begun is half done.","a":"Aristotle"},{"q":"Knowledge is power.","a":"Francis Bacon"},{"q":"Genius is one percent inspiration and ninety-nine percent perspiration.","a":"Thomas Edison"}];
+    let quoteIndex = -1;
+    function nextQuote() {
+        if (!FAMOUS_QUOTES.length) return;
+        quoteIndex = (quoteIndex + 1) % FAMOUS_QUOTES.length;
+        const item = FAMOUS_QUOTES[quoteIndex];
+        const qt = document.getElementById('quoteText');
+        const qa = document.getElementById('quoteAuthor');
+        if (qt) qt.textContent = item.q;
+        if (qa) qa.textContent = '——— ' + item.a;
+    }
+
     let wordbook = [];
     let lists = [];
     let settings = { review_mode: 'learn', dailyLimit: 5, autoLimit: false, level: '全部', weights: {en_zh:40, zh_en:40, spell:20}, autoAdapt: false, theme: 'system', reminder_enabled: false, reminder_time: '09:00' };
@@ -665,9 +678,15 @@
                 </div>
                 <div class="autocomplete-list" id="autoList"></div>
             </div>
+            <div class="card" id="quoteCard" style="margin-top:12px;cursor:pointer;" onclick="nextQuote()">
+                <p id="quoteText" style="text-indent:2em;line-height:1.6;min-height:1.6em;"></p>
+                <p id="quoteAuthor" style="text-align:right;margin-top:8px;color:var(--text-secondary);"></p>
+                <p style="margin-top:8px;font-size:0.8rem;color:var(--text-tertiary);text-align:right;">轻触换一句 ↑</p>
+            </div>
             <div id="searchResult"></div>
         `;
-        document.getElementById('searchInput').addEventListener('input', handleAutoComplete);
+        nextQuote();
+                document.getElementById('searchInput').addEventListener('input', handleAutoComplete);
         // 键盘弹出时隐藏导航栏，收起时恢复（避免导航栏被键盘顶上）
         const nav = document.querySelector('.nav');
         document.getElementById('searchInput').addEventListener('focus', () => {
@@ -1016,18 +1035,24 @@
         const word = currentQuestion.word;
         let data;
         try { data = await apiGet(`/api/search/${word}`); } catch(e) { reviewIndex++; renderCurrentQuestion(); return; }
-        function extractMeaning(trans) { return trans.replace(/^[a-zA-Z]+\s+(?=[a-z]+\.)/, ''); }
+        function extractMeaning(trans) { return (trans || '').trim(); }
+        function zhOption(trans) {
+            const t = extractMeaning(trans);
+            const m = t.match(/^([a-zA-Z]{1,8}\.)\s*([\u4e00-\u9fa5].*)$/);
+            if (m) { const first = m[2].split(/[,，、;；]/)[0].trim(); return m[1] + ' ' + first; }
+            return t;
+        }
         let fullTrans = extractMeaning(fmtTrans(data.translation));
         const stageNames = ['看英选中', '看中选英', '默写'];
         let html = `<div class="card"><h3 style="margin-bottom:8px;">题目 ${reviewIndex + 1}/${reviewQueue.length} · ${stageNames[currentQuestion.stage]}</h3><div style="text-align:center;margin:20px 0;">`;
         let allWords = [...wordbook.map(item => item.word)];
         if (allWords.length < 4) allWords = allWords.concat(['apple', 'book', 'cat', 'dog', 'run', 'tree', 'water', 'school']);
-        async function getZh(w) { try { const d = await apiGet(`/api/search/${w}`); return extractMeaning(fmtTrans(d.translation)); } catch(e) { return ''; } }
+        async function getZh(w) { try { const d = await apiGet(`/api/search/${w}`); return zhOption(fmtTrans(d.translation)); } catch(e) { return ''; } }
         const trunc = (s, n) => s && s.length > n ? s.slice(0, n - 1) + '…' : s;
         if (currentQuestion.stage === 0 || currentQuestion.stage === 1) {
             const isEnglish = currentQuestion.stage === 0;
             let display, correct, options;
-            if (isEnglish) { display = word; correct = fullTrans; const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); const translatedZhs = await Promise.all(randomWords.map(w => getZh(w))); const filtered = translatedZhs.filter(t => t && t !== correct); while(filtered.length < 3) { const defaults = ['n. 苹果', 'n. 书本', 'n. 老师']; const randomDefault = defaults[Math.floor(Math.random() * defaults.length)]; if (!filtered.includes(randomDefault) && randomDefault !== correct) filtered.push(randomDefault); } options = [...filtered, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
+            if (isEnglish) { display = word; correct = zhOption(fullTrans); const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); const translatedZhs = await Promise.all(randomWords.map(w => getZh(w))); const filtered = translatedZhs.filter(t => t && t !== correct); while(filtered.length < 3) { const defaults = ['n. 苹果', 'n. 书本', 'n. 老师']; const randomDefault = defaults[Math.floor(Math.random() * defaults.length)]; if (!filtered.includes(randomDefault) && randomDefault !== correct) filtered.push(randomDefault); } options = [...filtered, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
             else { display = fullTrans; correct = word; const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); options = [...randomWords, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
             window._currentAnswers = options; window._currentCorrect = correct;
             html += `<div style="font-size:2rem;margin-bottom:20px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${trunc(display, 40)}${isEnglish ? `<button class="speak-btn" style="font-size:1.3rem;vertical-align:middle;" onclick="speakWord('${word}')">🔊</button>` : ''}</div><p style="color:var(--text-secondary);margin-bottom:16px;">请选择正确${isEnglish ? '中文' : '英文'}释义</p>`;
@@ -1050,7 +1075,7 @@
         currentQuestion.correct_answer = currentQuestion.stage === 0 ? fullTrans : word;
         currentQuestion.translation = data.translation;
         window.typeChar = (char) => { const input = document.getElementById('spellInput'); if (char === 'del') input.value = input.value.slice(0, -1); else if (char === 'space') input.value += ' '; else input.value += char; };
-        window.checkSpell = () => { const input = document.getElementById('spellInput'); if (input.value.toLowerCase() === word) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; setTimeout(nextQuestion, 1000); } };
+        window.checkSpell = async () => { const input = document.getElementById('spellInput'); const ok = input.value.trim().toLowerCase() === word; if (ok) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: input.value, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 1000); } };
         // 保存复习进度（中断后可继续）
         saveReviewProgress();
     }
@@ -1338,6 +1363,10 @@
 
     /* 删除所有单词（保留列表、设置、学习记录） */
     function clearAllWords() {
+        if (reviewQueue.length > 0 && reviewIndex < reviewQueue.length) {
+            showConfirm('还有未做完的题目', '当前还有未完成的复习题目，请先完成或退出复习，再删除所有单词。', async () => {});
+            return;
+        }
         showConfirm('🗑️ 删除所有单词', '将删除单词本中的所有单词，<strong>无法恢复</strong>！列表和设置会保留。', async () => {
             try {
                 await apiPost('/api/reset', { mode: 'words' });

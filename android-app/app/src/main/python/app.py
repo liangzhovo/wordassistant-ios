@@ -139,11 +139,15 @@ def init_db():
             correct_answer TEXT,
             selected TEXT,
             translation TEXT,
+            correct_streak INTEGER DEFAULT 0,
             first_wrong DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_wrong DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (word, list_id)
         )
     ''')
+
+    # 错题本移除规则：连续答对 5 次才移除（旧库补列）
+    _add_col('wrong_book', 'correct_streak', 'INTEGER DEFAULT 0')
 
     # 单词缓存表（加入单词本时抓取完整信息，错题本/思维导图从此读取）
     conn.execute('''
@@ -403,6 +407,7 @@ def _upsert_wrong_book(cur, word, list_id, forgot, correct_answer, selected, tra
             correct_answer = excluded.correct_answer,
             selected = excluded.selected,
             translation = excluded.translation,
+            correct_streak = 0,
             last_wrong = datetime('now')''',
         (word, list_id, 'forgot' if forgot else 'wrong', correct_answer, selected, translation or ''))
 
@@ -460,8 +465,13 @@ def review_result():
         if new_interval >= 30:
             mastered = 1
         next_review = f"+{new_interval} day"
-        # 答对：移出错题本
-        cur.execute("DELETE FROM wrong_book WHERE word = ? AND list_id = ?", (word, list_id))
+        # 错题本移除规则：连续答对 5 次才移除；答对一次只累加不删除
+        cur.execute('''UPDATE wrong_book SET correct_streak = correct_streak + 1, last_wrong = datetime('now')
+                       WHERE word = ? AND list_id = ?''', (word, list_id))
+        cur.execute("SELECT correct_streak FROM wrong_book WHERE word = ? AND list_id = ?", (word, list_id))
+        wrong_streak_row = cur.fetchone()
+        if wrong_streak_row and (wrong_streak_row['correct_streak'] or 0) >= 5:
+            cur.execute("DELETE FROM wrong_book WHERE word = ? AND list_id = ?", (word, list_id))
     else:
         forget_count += 1
         review_count = max(0, review_count - 1)

@@ -81,6 +81,7 @@ enum Api {
                 correct_answer = excluded.correct_answer,
                 selected = excluded.selected,
                 translation = excluded.translation,
+                correct_streak = 0,
                 last_wrong = datetime('now')
         """, [word, listId, forgot ? "forgot" : "wrong", correctAnswer ?? "", selected ?? "", translation ?? ""])
     }
@@ -311,7 +312,15 @@ enum Api {
             if forgetCount > 0 { forgetCount = max(0, forgetCount - 1) }
             try DB.exec(db, "UPDATE settings SET value = CAST(value AS INTEGER) + 2 WHERE key = 'exp'")
             if newInterval >= 30 { mastered = 1 }
-            try DB.exec(db, "DELETE FROM wrong_book WHERE word = ? AND list_id = ?", [word, listId])
+            // 错题本移除规则：连续答对 5 次才移除；答错则重置为 0
+            try DB.exec(db, """
+                UPDATE wrong_book SET correct_streak = correct_streak + 1, last_wrong = datetime('now')
+                WHERE word = ? AND list_id = ?
+            """, [word, listId])
+            let wrongStreak = DB.query(db, "SELECT correct_streak FROM wrong_book WHERE word = ? AND list_id = ?", [word, listId]).first?["correct_streak"] as? Int ?? 0
+            if wrongStreak >= 5 {
+                try DB.exec(db, "DELETE FROM wrong_book WHERE word = ? AND list_id = ?", [word, listId])
+            }
         } else {
             forgetCount += 1
             reviewCount = max(0, reviewCount - 1)

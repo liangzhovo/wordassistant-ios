@@ -221,6 +221,12 @@ enum DB {
             try exec(db, "ALTER TABLE user_words ADD COLUMN interval INTEGER DEFAULT 0")
         }
 
+        // 错题本移除规则：连续答对 5 次才移除（旧库补列）
+        let wbCols = query(db, "PRAGMA table_info(wrong_book)").compactMap { $0["name"] as? String }
+        if !wbCols.contains("correct_streak") {
+            try exec(db, "ALTER TABLE wrong_book ADD COLUMN correct_streak INTEGER DEFAULT 0")
+        }
+
         try exec(db, """
             CREATE TABLE IF NOT EXISTS study_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -246,6 +252,7 @@ enum DB {
                 word TEXT NOT NULL,
                 list_id INTEGER DEFAULT 1,
                 wrong_count INTEGER DEFAULT 1,
+                correct_streak INTEGER DEFAULT 0,
                 last_reason TEXT,
                 correct_answer TEXT,
                 selected TEXT,
