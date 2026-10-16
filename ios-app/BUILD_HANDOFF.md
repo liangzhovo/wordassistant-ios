@@ -1,4 +1,4 @@
-# 🦉 单词助手 · iOS 构建交接说明（ECDICT 学生版词库 · v2 修复版）
+# 🦉 单词助手 · 构建交接说明（全平台仓库中的 iOS 端 · ECDICT 学生版词库 v2 修复版）
 
 > **给负责构建 iOS 的 AI / 开发者**
 > 本文档说明：词典数据源已更换为 **ECDICT 学生版 v2 修复版**，iOS 构建前需要**上传哪些文件**、**按什么顺序构建**、**如何验证**。
@@ -123,7 +123,11 @@ xcodebuild archive \
 - `.db.small`（学生核心，0.72 MB）**随仓库提交**，push 时正常携带；
 - **上传 data-v1 必须 `--clobber` 覆盖**（`node upload-db.js` 已内置），避免 CI 下载到旧 v1；
 - 若 `Utils.swift` / `Api.swift` 与 `app.py` 行为出现偏差，以 `app.py` 为准对齐；
-- 前端 `ios-app/WordAssistant/Resources/index.html` 由 `ios-app/scripts/make_index.py` 从 `android-app/app/src/main/assets/index.html` 生成（POST body 走 query、去除 lookbehind 正则），**每次前端改动后需重新生成并提交**；
+- **单一代码源**：前端只改仓库根目录 `index.html`，`scripts/sync_all.py` 负责同步到
+  `android-app/app/src/main/assets/index.html` 并转换为 `ios-app/WordAssistant/Resources/index.html`（POST body 走 query、去 lookbehind）；
+  后端只改根目录 `app.py`（桌面 + Android 同一文件）。改完后**必须**运行 `python scripts\sync_all.py` 并提交全部生成文件；
+- **接口契约**：新增/修改接口先更新根目录 `api_contract.json`，再同步移植 `Api.swift`，
+  用 `python scripts\check_swift_coverage.py` 校验 27 个接口两端都覆盖；CI 构建前也会做同样校验；
 - 词典由 `build_ecdict_dict.py` 从 `ecdict.csv`（ECDICT 原始数据，63 MB，见 [ECDICT 仓库](https://github.com/skywind3000/ECDICT)）可复现重建。
 
 ---

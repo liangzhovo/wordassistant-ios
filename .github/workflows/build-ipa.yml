@@ -5,6 +5,10 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'index.html'                          # 唯一前端源
+      - 'app.py'                              # 唯一 Python 后端源
+      - 'scripts/**'                          # 三端同步/契约校验脚本
+      - 'api_contract.json'                   # 接口契约
       - 'ios-app/**'
       - '.github/workflows/build-ipa.yml'
 
@@ -31,6 +35,12 @@ jobs:
         run: |
           ls -lh "android-app/app/src/main/assets/简明英汉字典增强版.db"
           echo "磁盘剩余: $(df -h / | tail -1)"
+
+      - name: Sync single-source assets (repo root -> platform copies)
+        run: |
+          python3 scripts/sync_all.py --check || { echo "前端/后端副本过期，先运行同步并提交生成文件"; exit 1; }
+          python3 scripts/check_swift_coverage.py || { echo "Swift 后端未覆盖接口契约"; exit 1; }
+        shell: bash
 
       - name: Install XcodeGen
         run: brew install xcodegen

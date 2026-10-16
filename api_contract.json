@@ -1,0 +1,32 @@
+{
+  "_comment": "单词助手 27 个接口的单一契约。三端后端共同遵守：app.py（桌面+Android 同一文件，由 scripts/sync_all.py 同步）与 ios-app/WordAssistant/Api.swift（Swift 移植）。新增/修改接口必须同时更新此文件，并运行 python scripts/check_swift_coverage.py 校验 Swift 覆盖。响应 keys 为顶层键（尽力而为，以 app.py 为准）。",
+  "endpoints": [
+    { "method": "GET", "path": "/api/study_log/month", "query": ["month"], "responseKeys": ["<date>:{add,review}"] },
+    { "method": "GET", "path": "/api/lists", "responseKeys": ["<list>[]"] },
+    { "method": "POST", "path": "/api/lists", "body": ["name"], "responseKeys": ["id", "name", "error?400"] },
+    { "method": "DELETE", "path": "/api/lists/{list_id}", "pathParams": ["list_id"], "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/wordbook", "query": ["list_id"], "responseKeys": ["<word>[]"] },
+    { "method": "POST", "path": "/api/wordbook", "body": ["word", "list_id"], "responseKeys": ["success", "error?404"] },
+    { "method": "DELETE", "path": "/api/wordbook/{word}", "pathParams": ["word"], "query": ["list_id"], "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/review", "query": ["list_id"], "responseKeys": ["<word>[]"] },
+    { "method": "POST", "path": "/api/review/result", "body": ["word", "correct", "forgot", "selected", "correct_answer", "list_id", "translation"], "responseKeys": ["success"] },
+    { "method": "POST", "path": "/api/review/finish", "responseKeys": ["success"] },
+    { "method": "POST", "path": "/api/reset", "body": ["mode"], "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/wordbook/wrong", "responseKeys": ["<wrong>[]"] },
+    { "method": "POST", "path": "/api/wordbook/{word}/clear_wrong", "pathParams": ["word"], "query": ["list_id"], "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/streak", "responseKeys": ["streak", "total_days"] },
+    { "method": "GET", "path": "/api/export", "query": ["list_id"], "responseKeys": ["app", "version", "exported_at", "exported_list_id", "word_lists", "user_words", "settings"] },
+    { "method": "POST", "path": "/api/import", "body": ["user_words", "word_lists", "settings", "target_list_id"], "responseKeys": ["success", "imported"] },
+    { "method": "GET", "path": "/api/search/{word}", "pathParams": ["word"], "responseKeys": ["word", "phonetic", "translation", "error?404"] },
+    { "method": "GET", "path": "/api/word/phrases/{word}", "pathParams": ["word"], "responseKeys": ["word", "phrases", "cached?"] },
+    { "method": "GET", "path": "/api/autocomplete", "query": ["q"], "responseKeys": ["<suggestion>[]"] },
+    { "method": "GET", "path": "/api/exp", "responseKeys": ["exp"] },
+    { "method": "GET", "path": "/api/review/progress", "responseKeys": ["<progress>|null"] },
+    { "method": "POST", "path": "/api/review/progress", "body": ["<progress>"], "responseKeys": ["success"] },
+    { "method": "POST", "path": "/api/review/progress/clear", "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/config", "responseKeys": ["<key:value>{}"] },
+    { "method": "POST", "path": "/api/config", "body": ["<settings>"], "responseKeys": ["success"] },
+    { "method": "GET", "path": "/api/note", "responseKeys": ["content"] },
+    { "method": "POST", "path": "/api/note", "body": ["content"], "responseKeys": ["success"] }
+  ]
+}

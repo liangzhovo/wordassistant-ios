@@ -1,7 +1,7 @@
-# 🦉 单词助手 — iOS (IPA) 构建
+# 🦉 单词助手（桌面 / Android / iOS 三端）
 
 离线单词助手：搜索、生词本、SM-2 间隔重复复习、错题本、打卡、笔记、导入导出。
-本仓库同时包含 Android 版（`android-app/`）与 Python Web 版（`app.py`）源码。
+**这是一个全平台仓库**：桌面 Python Web 版（`app.py` + `index.html`）、Android 版（`android-app/`）、iOS 版（`ios-app/`）同源共用同一份词典数据与前端。本文档侧重说明 iOS 版（IPA）构建，其余端源码同样在本仓库。
 
 iOS 版是**全平台一致的离线应用**：
 
@@ -11,15 +11,53 @@ iOS 版是**全平台一致的离线应用**：
 
 ---
 
+## 单一代码源（改一处，三端生效）
+
+**根目录就是唯一代码源**，三个平台不各自维护副本：
+
+| 代码源（根目录） | 桌面端 | Android | iOS |
+|---|---|---|---|
+| `index.html`（前端） | 直接服务 | 构建时同步到 `assets/index.html` | 构建时转换到 `Resources/index.html` |
+| `app.py`（27 个接口） | 直接运行 | 构建时同步到 `python/app.py` | Swift 移植（以 `api_contract.json` 对照） |
+| `api_contract.json`（接口契约） | — | — | Swift 覆盖校验依据 |
+
+**改代码后的标准流程**：
+
+```bash
+# 1. 只改根目录 index.html / app.py / api_contract.json
+# 2. 一键同步到各端构建位置 + 校验 Swift 契约覆盖
+python scripts/sync_all.py --check    # 先看漂移（含 27 接口契约覆盖检查）
+python scripts/sync_all.py            # 生成三端副本
+# 3. 提交全部文件（含生成副本），推送后 CI 自动构建 iOS IPA
+```
+
+- Android 构建（`android-app/一键构建APK.bat`）构建前自动运行同步，改根目录代码直接生效；
+- iOS CI（`.github/workflows/build-ipa.yml`）构建前校验同步与 Swift 契约覆盖，不通过会失败；
+- **Windows 桌面测试就是手机端的行为基线**：同一份 `index.html`、同一份 `app.py` 逻辑。
+  启动桌面版 `python app.py` 看到的界面与手机完全一致；接口回归跑
+  `python scripts/smoke_api.py`（在词典临时副本上执行，29 项检查）。
+
+---
+
 ## 目录结构
 
 ```
+（根目录 = 唯一代码源）
+index.html                  # ★ 前端唯一源（桌面直接服务；Android/iOS 由此生成）
+app.py                      # ★ Python 后端唯一源（桌面 + Android Chaquopy 同一文件）
+api_contract.json           # ★ 27 接口契约（Swift 后端覆盖校验依据）
+scripts/
+├── sync_all.py             # ★ 一键三端同步 + --check 漂移校验（含契约检查）
+├── make_index.py           # iOS 前端转换（POST body 走 query、去 lookbehind）
+├── check_swift_coverage.py # 校验 Api.swift 是否覆盖契约全部接口
+└── smoke_api.py            # 桌面端接口冒烟测试（29 项，词典临时副本上执行）
+
+android-app/                # 构建时由 sync_all.py 注入 index.html / app.py 副本
 ios-app/
-├── project.yml                 # XcodeGen 工程定义（CI 用它生成 .xcodeproj）
+├── project.yml             # XcodeGen 工程定义（CI 用它生成 .xcodeproj）
 ├── scripts/
-│   ├── fetch-db.sh             # 下载/回退词典（CI 与本地共用）
-│   ├── make_index.py           # 由 Android 前端生成 iOS 版前端（body 走 query、去 lookbehind）
-│   └── make_icons.py           # 由 Android 图标生成 iOS AppIcon
+│   ├── fetch-db.sh         # 下载/回退词典（CI 与本地共用）
+│   └── make_icons.py       # 由 Android 图标生成 iOS AppIcon
 └── WordAssistant/
     ├── AppDelegate.swift
     ├── ViewController.swift    # WKWebView + JS 桥接（模拟 window.Android）+ 启动画面

@@ -1,10 +1,17 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 import sqlite3
 from datetime import datetime
 import os, re, threading, time
 import sys
 
-app = Flask(__name__)
+# ===== 桌面端与 Android 端共用同一份 app.py（由 scripts/sync_all.py 同步到 Android）=====
+# Android（Chaquopy）没有 pywebview，导入失败时置空，桌面端 __main__ 才使用。
+try:
+    import webview
+except ImportError:
+    webview = None
+
+app = Flask(__name__, static_folder='.', static_url_path='')
 
 # 数据库路径：由 Android 端 MainActivity 启动时通过 set_db_path() 注入
 DB_PATH = "简明英汉字典增强版.db"
@@ -820,8 +827,12 @@ def save_note():
 
 @app.route('/')
 def index():
-    # 返回前端页面
-    return "Word Assistant API Server is running!"
+    # 桌面端：返回前端页面（根目录 index.html，与 Android assets / iOS Resources 同一内容源）；
+    # Android 端由 WebView 直接加载 assets/index.html，不走此路由；此处兜底返回纯文本。
+    try:
+        return send_from_directory('.', 'index.html')
+    except Exception:
+        return "Word Assistant API Server is running!"
 
 def main():
     """Android 端入口：由 MainActivity 在后台线程中调用"""
@@ -830,4 +841,14 @@ def main():
     app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False, threaded=True)
 
 if __name__ == '__main__':
-    main()
+    # ===== 桌面端启动逻辑（固定端口，Android 端由 MainActivity 调用 main()）=====
+    init_db()
+    port = 5000  # 固定端口，可修改为其他数字
+    print(f"🚀 服务启动，端口 {port}（如果被占用，请修改 app.py 中的 port = 5000）")
+
+    # 后台启动 Flask
+    threading.Thread(target=lambda: app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False, threaded=True), daemon=True).start()
+
+    # 弹出窗口加载页面
+    webview.create_window('🦉 单词助手', f'http://127.0.0.1:{port}', width=450, height=800, resizable=True, background_color='#F8FAFC', text_select=False)
+    webview.start(gui='edgechromium')

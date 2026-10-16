@@ -3,7 +3,13 @@ import sqlite3
 from datetime import datetime
 import os, re, threading, time
 import sys
-import webview
+
+# ===== 桌面端与 Android 端共用同一份 app.py（由 scripts/sync_all.py 同步到 Android）=====
+# Android（Chaquopy）没有 pywebview，导入失败时置空，桌面端 __main__ 才使用。
+try:
+    import webview
+except ImportError:
+    webview = None
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -821,8 +827,12 @@ def save_note():
 
 @app.route('/')
 def index():
-    # 桌面端：返回前端页面（Android 端由 WebView 直接加载 assets/index.html，不走此路由）
-    return send_from_directory('.', 'index.html')
+    # 桌面端：返回前端页面（根目录 index.html，与 Android assets / iOS Resources 同一内容源）；
+    # Android 端由 WebView 直接加载 assets/index.html，不走此路由；此处兜底返回纯文本。
+    try:
+        return send_from_directory('.', 'index.html')
+    except Exception:
+        return "Word Assistant API Server is running!"
 
 def main():
     """Android 端入口：由 MainActivity 在后台线程中调用"""
