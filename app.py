@@ -33,6 +33,14 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
     return response
 
+@app.errorhandler(Exception)
+def handle_uncaught_error(e):
+    """统一错误响应：始终返回 JSON（前端依赖 res.ok 与 error 字段判断失败）"""
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return jsonify({'error': e.description or e.name}), e.code
+    return jsonify({'error': '服务器内部错误'}), 500
+
 def get_db():
     """获取数据库连接"""
     conn = sqlite3.connect(DB_PATH, timeout=10)

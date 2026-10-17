@@ -511,6 +511,20 @@
         } catch (e) {}
         return settings.weights;
     }
+    /* HTML 转义：所有用户/词典数据拼接进 innerHTML 前必须经过 esc() */
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    /* 全局事件委托：speak / 删除单词 / 立即复习（替代内联 onclick 字符串拼接，杜绝引号注入） */
+    document.addEventListener('click', (e) => {
+        const t = e.target;
+        const speak = t.closest('[data-speak]');
+        if (speak) { speakWord(speak.dataset.speak); return; }
+        const del = t.closest('[data-delete-word]');
+        if (del) { removeWordFromBook(del.dataset.deleteWord); return; }
+        const rev = t.closest('[data-immediate-review]');
+        if (rev) { startImmediateReview(rev.dataset.immediateReview); }
+    });
+    /* 答题防抖锁：防止连点导致跳题 */
+    let answering = false;
     let currentView = 'search';
     let noteDirty = false;  // 记事本是否有未保存修改
     let currentSearchWord = null;
@@ -596,7 +610,7 @@
             const lists = await apiGet('/api/lists');
             const opts = ['<div class="modal-option" data-id="all" onclick="window._pickerCallback(\'all\')"><strong>📋 全部列表</strong><span>导出/导入所有数据</span></div>'];
             lists.forEach(l => {
-                opts.push(`<div class="modal-option" data-id="${l.id}" onclick="window._pickerCallback(${l.id})"><strong>${l.name || '默认列表'}</strong><span>列表 ID: ${l.id}</span></div>`);
+                opts.push(`<div class="modal-option" data-id="${l.id}" onclick="window._pickerCallback(${l.id})"><strong>${esc(l.name || '默认列表')}</strong><span>列表 ID: ${l.id}</span></div>`);
             });
             const html = `<div class="modal-mask" id="listPickerMask" onclick="if(event.target===this)closeModal()">
                 <div class="modal">
@@ -724,16 +738,16 @@
                 } else if (w.reason === 'wrong') {
                     reasonHtml = `<div class="wrong-reason" style="font-size:0.82rem;margin-top:4px;">
                         <div style="color:#EF4444;font-weight:600;margin-bottom:2px;">❌ 答错了</div>
-                        <div style="color:#10B981;">✅ 正确答案：${fmtTrans(w.correct_answer)}</div>
-                        <div style="color:#EF4444;">❌ 你选择了：${fmtTrans(w.selected)}</div>
+                        <div style="color:#10B981;">✅ 正确答案：${esc(fmtTrans(w.correct_answer))}</div>
+                        <div style="color:#EF4444;">❌ 你选择了：${esc(fmtTrans(w.selected))}</div>
                     </div>`;
                 } else {
                     reasonHtml = `<div class="wrong-reason" style="font-size:0.85rem;color:#F59E0B;margin-top:4px;">😵 忘记了</div>`;
                 }
                 html += `<div class="wrong-item">
-                    <div><span style="font-weight:700;">${w.word}</span><span class="wrong-count">错 ${w.forget_count} 次</span>
-                    <div class="word-trans">${fmtTrans(w.translation)}</div>${reasonHtml}</div>
-                    <button class="speak-btn" onclick="speakWord('${w.word}')">🔊</button>
+                    <div><span style="font-weight:700;">${esc(w.word)}</span><span class="wrong-count">错 ${w.forget_count} 次</span>
+                    <div class="word-trans">${esc(fmtTrans(w.translation))}</div>${reasonHtml}</div>
+                    <button class="speak-btn" data-speak="${esc(w.word)}">🔊</button>
                 </div>`;
             });
         }
@@ -1028,11 +1042,11 @@
             const isInBook = wordbook.some(item => item.word === word);
             await fadeReplace(resultContainer, `
                 <div class="card" id="resultCard">
-                    <h2>${data.word} <button class="speak-btn" onclick="speakWord('${data.word}')">🔊</button> <small style="color:var(--text-secondary)">${data.phonetic}</small></h2>
-                    <p style="color:var(--text-tertiary); margin:8px 0;">${fmtTrans(data.translation)}</p>
+                    <h2>${esc(data.word)} <button class="speak-btn" data-speak="${esc(data.word)}">🔊</button> <small style="color:var(--text-secondary)">${esc(data.phonetic)}</small></h2>
+                    <p style="color:var(--text-tertiary); margin:8px 0;">${esc(fmtTrans(data.translation))}</p>
                     <div style="display:flex; gap:8px; margin-top:16px;">
                         <button id="addBtn" class="btn-primary" onclick="openListModal()">${isInBook ? '✓ 已添加' : '📖 加入单词本'}</button>
-                        <button class="btn-warning" onclick="startImmediateReview('${word}')">⚡ 立即复习</button>
+                        <button class="btn-warning" data-immediate-review="${esc(word)}">⚡ 立即复习</button>
                     </div>
                 </div>`);
             if (isInBook) document.getElementById('addBtn').style.background = '#10B981';
@@ -1047,7 +1061,7 @@
         lists.forEach(list => {
             const btn = document.createElement('div');
             btn.className = 'list-option';
-            btn.innerHTML = `<span>${list.name}</span><span style="color:var(--text-secondary); font-size:0.9rem;">→</span>`;
+            btn.innerHTML = `<span>${esc(list.name)}</span><span style="color:var(--text-secondary); font-size:0.9rem;">→</span>`;
             btn.onclick = () => addToList(list.id);
             container.appendChild(btn);
         });
@@ -1089,8 +1103,8 @@
         if (!lists.some(l => l.id === currentListId)) currentListId = 1;
         let listHtml = `<div class="list-manager">`;
         lists.forEach(l => {
-            if (l.id === 1) { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${l.name}</div>`; }
-            else { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${l.name}<span style="margin-left:6px;" onclick="event.stopPropagation(); openDeleteModal(${l.id})">×</span></div>`; }
+            if (l.id === 1) { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${esc(l.name)}</div>`; }
+            else { listHtml += `<div class="list-chip ${l.id === currentListId ? 'active' : ''}" onclick="switchList(${l.id})">${esc(l.name)}<span style="margin-left:6px;" onclick="event.stopPropagation(); openDeleteModal(${l.id})">×</span></div>`; }
         });
         listHtml += `<div class="list-new" onclick="createNewList()">+ 新建列表</div></div>`;
         await loadWordbook();
@@ -1108,7 +1122,7 @@
                 for (const item of groupedWords[letter]) {
                     const word = item.word;
                     if (word.length > 40) continue;  // 超长词跳过不显示，防止撑破UI
-                    listContent += `<div id="bookItem-${word}" class="word-row"><div class="word-info"><div class="word-main">${word} <button class="speak-btn" onclick="speakWord('${word}')">🔊</button> <span class="word-phon">${item.phonetic || ''}</span> ${item.mastered ? '✅' : ''}</div><div class="word-trans">${fmtTrans(item.translation)}</div></div><button class="del-btn" onclick="removeWordFromBook('${word}')">删除</button></div>`;
+                    listContent += `<div class="word-row"><div class="word-info"><div class="word-main">${esc(word)} <button class="speak-btn" data-speak="${esc(word)}">🔊</button> <span class="word-phon">${esc(item.phonetic || '')}</span> ${item.mastered ? '✅' : ''}</div><div class="word-trans">${esc(fmtTrans(item.translation))}</div></div><button class="del-btn" data-delete-word="${esc(word)}">删除</button></div>`;
                 }
             }
         }
@@ -1149,7 +1163,7 @@
 
         let scopeHtml = `<div style="margin-bottom:16px;"><h4 style="font-size:0.95rem; color:var(--text-secondary); margin-bottom:8px;">选择复习范围</h4><div class="list-manager">`;
         scopeHtml += `<div class="list-chip ${reviewListId === 'all' ? 'active' : ''}" onclick="setReviewList('all')">全部列表</div>`;
-        lists.forEach(l => { scopeHtml += `<div class="list-chip ${reviewListId === l.id ? 'active' : ''}" onclick="setReviewList(${l.id})">${l.name}</div>`; });
+        lists.forEach(l => { scopeHtml += `<div class="list-chip ${reviewListId === l.id ? 'active' : ''}" onclick="setReviewList(${l.id})">${esc(l.name)}</div>`; });
         scopeHtml += `</div></div>`;
 
         container.innerHTML = `${scopeHtml}<div id="planWrapper" class="plan-wrapper"><div class="card"><h3>复习计划</h3><p style="margin-top:8px;">当前每日复习量：<strong>${limit}</strong> 个</p><p style="font-size:0.9rem;color:var(--text-secondary);">答对+2经验，完成复习额外+10</p><button class="btn-primary" style="margin-top:16px; width:100%;" onclick="startReview()">开始今日复习</button></div></div><div id="reviewArea"></div>`;
@@ -1296,6 +1310,7 @@
     }
 
     async function renderCurrentQuestion() {
+        answering = false;  // 新题渲染即解锁（上一题的延时跳题计时器已失效）
         const reviewArea = document.getElementById('reviewArea');
         if (reviewIndex >= reviewQueue.length) { try { await apiPost('/api/review/finish', {}); } catch(e) {} clearReviewProgress(); updateLevelTag(); reviewArea.innerHTML = `<div class="card" style="text-align:center;"><h2>🎉 复习完成！</h2><p>答对题目：${correctCount}</p><p style="font-size:0.9rem;color:var(--text-secondary);">经验+10</p><button class="btn-primary" onclick="renderReview(document.getElementById('viewContainer'))">返回</button></div>`; return; }
         currentQuestion = reviewQueue[reviewIndex];
@@ -1314,7 +1329,12 @@
         let html = `<div class="card"><h3 style="margin-bottom:8px;">题目 ${reviewIndex + 1}/${reviewQueue.length} · ${stageNames[currentQuestion.stage]}</h3><div style="text-align:center;margin:20px 0;">`;
         let allWords = [...wordbook.map(item => item.word)];
         if (allWords.length < 4) allWords = allWords.concat(['apple', 'book', 'cat', 'dog', 'run', 'tree', 'water', 'school']);
-        async function getZh(w) { try { const d = await apiGet(`/api/search/${w}`); return zhOption(fmtTrans(d.translation)); } catch(e) { return ''; } }
+        async function getZh(w) {
+            // 优先用已加载单词本的翻译，减少每道题的 API 请求
+            const hit = wordbook.find(i => i.word === w);
+            if (hit && hit.translation) return zhOption(fmtTrans(hit.translation));
+            try { const d = await apiGet(`/api/search/${w}`); return zhOption(fmtTrans(d.translation)); } catch(e) { return ''; }
+        }
         const trunc = (s, n) => s && s.length > n ? s.slice(0, n - 1) + '…' : s;
         if (currentQuestion.stage === 0 || currentQuestion.stage === 1) {
             const isEnglish = currentQuestion.stage === 0;
@@ -1322,10 +1342,10 @@
             if (isEnglish) { display = word; correct = zhOption(fullTrans); const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); const translatedZhs = await Promise.all(randomWords.map(w => getZh(w))); const filtered = translatedZhs.filter(t => t && t !== correct); while(filtered.length < 3) { const defaults = ['n. 苹果', 'n. 书本', 'n. 老师']; const randomDefault = defaults[Math.floor(Math.random() * defaults.length)]; if (!filtered.includes(randomDefault) && randomDefault !== correct) filtered.push(randomDefault); } options = [...filtered, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
             else { display = fullTrans; correct = word; const randomWords = allWords.filter(w => w !== word).sort(() => Math.random() - 0.5).slice(0, 3); options = [...randomWords, correct].sort(() => Math.random() - 0.5).slice(0, 4); }
             window._currentAnswers = options; window._currentCorrect = correct;
-            html += `<div style="font-size:2rem;margin-bottom:20px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${trunc(display, 40)}${isEnglish ? `<button class="speak-btn" style="font-size:1.3rem;vertical-align:middle;" onclick="speakWord('${word}')">🔊</button>` : ''}</div><p style="color:var(--text-secondary);margin-bottom:16px;">请选择正确${isEnglish ? '中文' : '英文'}释义</p>`;
-            options.forEach((opt, index) => { const isRight = opt === correct ? 'data-correct="true"' : ''; html += `<button class="option" ${isRight} onclick="checkAnswerByIndex(${index}, this)">${trunc(opt, 60)}</button>`; });
+            html += `<div style="font-size:2rem;margin-bottom:20px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${trunc(esc(display), 40)}${isEnglish ? `<button class="speak-btn" style="font-size:1.3rem;vertical-align:middle;" data-speak="${esc(word)}">🔊</button>` : ''}</div><p style="color:var(--text-secondary);margin-bottom:16px;">请选择正确${isEnglish ? '中文' : '英文'}释义</p>`;
+            options.forEach((opt, index) => { const isRight = opt === correct ? 'data-correct="true"' : ''; html += `<button class="option" ${isRight} onclick="checkAnswerByIndex(${index}, this)">${trunc(esc(opt), 60)}</button>`; });
         } else if (currentQuestion.stage === 2) {
-            html += `<div style="font-size:1.2rem;margin-bottom:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">请输入：<strong>${trunc(fullTrans, 80)}</strong></div><input type="text" id="spellInput" readonly style="width:100%;padding:12px;text-align:center;font-size:1.5rem;border-bottom:2px solid var(--primary);margin-bottom:20px; background:transparent;" placeholder="点击下方按键输入"><div class="keyboard">`;
+            html += `<div style="font-size:1.2rem;margin-bottom:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">请输入：<strong>${trunc(esc(fullTrans), 80)}</strong></div><input type="text" id="spellInput" readonly style="width:100%;padding:12px;text-align:center;font-size:1.5rem;border-bottom:2px solid var(--primary);margin-bottom:20px; background:transparent;" placeholder="点击下方按键输入"><div class="keyboard">`;
             ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].forEach(row => {
                 html += `<div class="keyboard-row">`;
                 for (const ch of row) { html += `<div class="key" onclick="typeChar('${ch}')">${ch.toUpperCase()}</div>`; }
@@ -1342,18 +1362,20 @@
         currentQuestion.correct_answer = currentQuestion.stage === 0 ? fullTrans : word;
         currentQuestion.translation = data.translation;
         window.typeChar = (char) => { const input = document.getElementById('spellInput'); if (char === 'del') input.value = input.value.slice(0, -1); else if (char === 'space') input.value += ' '; else input.value += char; };
-        window.checkSpell = async () => { const input = document.getElementById('spellInput'); const ok = input.value.trim().toLowerCase() === word; if (ok) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: input.value, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 1000); } };
+        window.checkSpell = async () => { if (answering) return; answering = true; const input = document.getElementById('spellInput'); const ok = input.value.trim().toLowerCase() === word; if (ok) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: input.value, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 1000); } };
         // 保存复习进度（中断后可继续）
         saveReviewProgress();
     }
 
     window.checkAnswerByIndex = (index, el) => {
+        if (answering) return; answering = true;
         const selected = window._currentAnswers[index]; const correct = window._currentCorrect;
         if (selected === correct) { el.classList.add('correct'); correctCount++; stats[currentQuestion.type].correct++; apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 600); }
         else { el.classList.add('wrong'); stats[currentQuestion.type].wrong++; document.querySelectorAll('.option[data-correct="true"]').forEach(b => { b.classList.add('correct'); b.disabled = true; }); apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: selected, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 1500); }
     };
 
     async function handleForgot() {
+        if (answering) return; answering = true;
         if (!currentQuestion) return;
         const word = currentQuestion.word;
         stats[currentQuestion.type].wrong++;
