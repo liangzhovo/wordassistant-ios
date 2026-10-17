@@ -73,10 +73,10 @@
         /* 【新增】复习计划卡片收起/展开动画 */
         .plan-wrapper { overflow:hidden; transition:max-height 0.5s var(--ease-out), opacity 0.35s var(--ease-out), margin 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
 
-        /* 顶部加载进度条：整条从左端延伸到右端（增长到全宽），然后整体渐变消失（循环） */
+        /* 顶部加载进度条：固定从左边缘填充到右边缘，只播一次，播完整体渐隐（每次加载都一样） */
         .loading-bar { position:fixed; top:0; left:0; right:0; height:3px; z-index:9999; opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
         .loading-bar.active { opacity:1; }
-        .loading-bar::before { content:''; position:absolute; top:0; bottom:0; left:0; width:0; background:var(--primary); opacity:0; animation:loading-slide var(--load-dur, 1.8s) linear infinite; }
+        .loading-bar::before { content:''; position:absolute; top:0; bottom:0; left:0; width:0; background:var(--primary); opacity:0; animation:loading-slide 1.8s linear forwards; }
         @keyframes loading-slide {
             0% { width:0%; opacity:0; }
             8% { opacity:1; }
@@ -784,10 +784,11 @@
         loadingCount++;
         const bar = document.getElementById('loadingBar');
         if (bar) {
-            // 每次新的加载序列随机动画时长（1.2~2.8s），让进度条每次都不一样
+            // 每次新的加载序列：进度条固定从左到右填充一次（无随机、无循环）
             if (loadingCount === 1) {
-                const dur = (1.2 + Math.random() * 1.6).toFixed(2) + 's';
-                bar.style.setProperty('--load-dur', dur);
+                bar.style.animation = 'none';
+                void bar.offsetWidth;  // 强制 reflow，重启动画
+                bar.style.animation = '';
             }
             bar.classList.add('active');
         }
