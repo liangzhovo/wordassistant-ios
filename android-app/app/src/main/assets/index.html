@@ -1159,29 +1159,39 @@
 
     async function setReviewList(id) { reviewListId = id; await renderReview(document.getElementById('viewContainer')); }
 
+    /* Thompson 采样结果缓存：统计未变化时权重保持稳定（勾选/重进页面不变），
+    答题使统计变化后才重新采样（保留多臂老虎机的探索/利用） */
+    let _banditCache = null;
+
+    function thompsonSample() {
+        const arms = ['en_zh', 'zh_en', 'spell'];
+        function betaSample(a, b) {
+            // a/b 为整数 → 用 Erlang（Gamma 整数形状）采样：a 个指数和 / (a 个 + b 个)
+            function gammaInt(k) { let x = 0; for (let i = 0; i < k; i++) x += -Math.log(1 - Math.random()); return x; }
+            const x = gammaInt(a), y = gammaInt(b);
+            return x / (x + y);
+        }
+        const samples = arms.map(t => {
+            const s = stats[t] || { correct: 0, wrong: 0 };
+            return betaSample((s.correct || 0) + 1, (s.wrong || 0) + 1);
+        });
+        const sum = samples.reduce((a, b) => a + b, 0);
+        const w = {};
+        arms.forEach((t, i) => { w[t] = sum > 0 ? Math.round(samples[i] / sum * 100) : (t === 'spell' ? 20 : 40); });
+        // 保底与归一化（和≈100）
+        Object.keys(w).forEach(t => { if (w[t] < 5) w[t] = 5; });
+        const tot = w.en_zh + w.zh_en + w.spell;
+        if (tot > 0) { const k = 100 / tot; w.en_zh = Math.round(w.en_zh * k); w.zh_en = Math.round(w.zh_en * k); w.spell = Math.max(5, 100 - w.en_zh - w.zh_en); }
+        return w;
+    }
+
     function getCurrentWeights() {
         if (settings.autoAdapt) {
-            // 多臂老虎机（Thompson sampling）：每题型按 Beta(correct+1, wrong+1) 后验抽样，
-            // 样本值比例即出题权重。统计来自后端持久化 type_stats（跨启动累计）。
-            const arms = ['en_zh', 'zh_en', 'spell'];
-            function betaSample(a, b) {
-                // a/b 为整数 → 用 Erlang（Gamma 整数形状）采样：a 个指数和 / (a 个 + b 个)
-                function gammaInt(k) { let x = 0; for (let i = 0; i < k; i++) x += -Math.log(1 - Math.random()); return x; }
-                const x = gammaInt(a), y = gammaInt(b);
-                return x / (x + y);
+            const key = JSON.stringify(stats);
+            if (!_banditCache || _banditCache.key !== key) {
+                _banditCache = { key, w: thompsonSample() };
             }
-            const samples = arms.map(t => {
-                const s = stats[t] || { correct: 0, wrong: 0 };
-                return betaSample((s.correct || 0) + 1, (s.wrong || 0) + 1);
-            });
-            const sum = samples.reduce((a, b) => a + b, 0);
-            const w = {};
-            arms.forEach((t, i) => { w[t] = sum > 0 ? Math.round(samples[i] / sum * 100) : (t === 'spell' ? 20 : 40); });
-            // 保底与归一化（和≈100）
-            Object.keys(w).forEach(t => { if (w[t] < 5) w[t] = 5; });
-            const tot = w.en_zh + w.zh_en + w.spell;
-            if (tot > 0) { const k = 100 / tot; w.en_zh = Math.round(w.en_zh * k); w.zh_en = Math.round(w.zh_en * k); w.spell = Math.max(5, 100 - w.en_zh - w.zh_en); }
-            return w;
+            return _banditCache.w;
         }
         return settings.weights || { en_zh: 40, zh_en: 40, spell: 20 };
     }
