@@ -31,7 +31,7 @@
             --neu-i-xs:inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
             --neu-primary:6px 6px 12px rgba(109,93,252,0.32), -6px -6px 12px var(--shadow-light);
             --neu-primary-sm:4px 4px 8px rgba(109,93,252,0.32), -4px -4px 8px var(--shadow-light);
-            --neu-primary-i:inset 4px 4px 8px rgba(87,72,224,0.45), inset -4px -4px 8px rgba(255,255,255,0.25);
+            --neu-primary-i:inset 4px 4px 8px rgba(87,72,224,0.5);
             --ease-out:cubic-bezier(0.23,1,0.32,1);
         }
         /* 深色模式（新拟物深灰：仅切换配色，光源方向不变） */
@@ -46,7 +46,7 @@
             --reviewed-bg:#37325c; --reviewed-text:#b0a5ff;
             --del-bg:#5c2e2e; --del-text:#f09a9a;
             --chip-bg:#323640; --list-new-bg:#3a3560; --exp-bar-bg:#2b2f36;
-            --toast-bg:#e3e7ec; --toast-text:#23262b;
+            --toast-bg:#3a3f47; --toast-text:#f2f4f7;
             --header-bg:#2b2f36; --nav-bg:#2b2f36; --modal-bg:#2b2f36;
             --autocomplete-bg:#323640; --hover-bg:#31363e; --border-light:rgba(255,255,255,0.07);
             --muted:#323640; --muted-strong:#383d46; --muted-stronger:#414650;
@@ -72,10 +72,10 @@
         .btn-primary:active { box-shadow:var(--neu-primary-i); }
         .btn-success { background:var(--success); color:#fff; padding:10px 18px; border-radius:24px; font-weight:600; box-shadow:6px 6px 12px rgba(78,205,196,0.35), -6px -6px 12px var(--shadow-light); }
         .btn-success:hover { box-shadow:4px 4px 8px rgba(78,205,196,0.35), -4px -4px 8px var(--shadow-light); }
-        .btn-success:active { box-shadow:inset 4px 4px 8px rgba(46,150,143,0.45), inset -4px -4px 8px rgba(255,255,255,0.3); }
+        .btn-success:active { box-shadow:inset 4px 4px 8px rgba(46,150,143,0.5); }
         .btn-warning { background:var(--warning); color:#fff; padding:10px 18px; border-radius:24px; font-weight:600; box-shadow:6px 6px 12px rgba(240,165,0,0.35), -6px -6px 12px var(--shadow-light); }
         .btn-warning:hover { box-shadow:4px 4px 8px rgba(240,165,0,0.35), -4px -4px 8px var(--shadow-light); }
-        .btn-warning:active { box-shadow:inset 4px 4px 8px rgba(200,140,0,0.5), inset -4px -4px 8px rgba(255,255,255,0.3); }
+        .btn-warning:active { box-shadow:inset 4px 4px 8px rgba(200,140,0,0.55); }
         /* 联想下拉框 */
         .autocomplete-list { position:absolute; top:100%; left:0; right:0; margin-top:10px; background:var(--autocomplete-bg); border-radius:16px; box-shadow:var(--neu-r); z-index:200; overflow:hidden; visibility:hidden; opacity:0; transform:translateY(-14px) scale(0.96); transform-origin:top center; max-height:0; transition:opacity 0.42s var(--ease-out), transform 0.42s var(--ease-out), max-height 0.5s var(--ease-out), visibility 0s linear 0.42s; }
         .autocomplete-list.show { visibility:visible; opacity:1; transform:translateY(0) scale(1); max-height:420px; transition:opacity 0.42s var(--ease-out), transform 0.42s var(--ease-out), max-height 0.5s var(--ease-out), visibility 0s linear 0s; }
@@ -163,7 +163,7 @@
         .modal-btn-confirm { background:var(--primary); color:#fff; box-shadow:var(--neu-primary-sm); }
         .modal-btn-confirm:active { box-shadow:var(--neu-primary-i); }
         .modal-btn-danger { background:var(--danger); color:#fff; box-shadow:6px 6px 12px rgba(255,107,107,0.35), -6px -6px 12px var(--shadow-light); }
-        .modal-btn-danger:active { box-shadow:inset 4px 4px 8px rgba(200,60,60,0.45), inset -4px -4px 8px rgba(255,255,255,0.3); }
+        .modal-btn-danger:active { box-shadow:inset 4px 4px 8px rgba(200,60,60,0.5); }
         .alphabet-index { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 4px; margin:10px 0; padding-bottom:4px; }
         .alpha-btn { flex:0 0 auto; width:30px; height:30px; border-radius:50%; background:var(--card); box-shadow:var(--neu-r-xs); color:var(--text); display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:0.8rem; font-weight:700; transition:box-shadow 0.3s ease-in-out, color 0.3s ease-in-out; }
         .alpha-btn:hover { box-shadow:var(--neu-i-xs); color:var(--primary); }
@@ -1147,7 +1147,7 @@
     async function confirmCreateList() {
         const input = document.getElementById('newListNameInput');
         const name = input.value.trim();
-        if (!name) { input.style.boxShadow = 'inset 4px 4px 8px rgba(224,60,60,0.3), inset -4px -4px 8px rgba(255,255,255,0.6)'; input.placeholder = '名称不能为空'; setTimeout(() => { input.style.boxShadow = 'var(--neu-i)'; input.placeholder = '请输入新列表名称'; }, 1500); return; }
+        if (!name) { input.style.boxShadow = 'inset 4px 4px 8px rgba(224,60,60,0.4)'; input.placeholder = '名称不能为空'; setTimeout(() => { input.style.boxShadow = 'var(--neu-i)'; input.placeholder = '请输入新列表名称'; }, 1500); return; }
         const newList = await apiPost('/api/lists', { name: name });
         currentListId = newList.id;
         closeCustomModal();
