@@ -198,16 +198,6 @@
         body[data-theme="dark"] .search-box input { color-scheme: dark; }
         body[data-theme="dark"] input[type="time"] { color-scheme: dark; }
 
-        /* 记事本 */
-        .note-textarea { width:100%; min-height:42vh; background:var(--card); color:var(--text); border:2px solid var(--input-border); border-radius:14px; padding:14px; font-size:0.95rem; line-height:1.65; font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace; resize:vertical; box-sizing:border-box; }
-        .note-textarea::placeholder { color:var(--text-secondary); }
-        .note-textarea:focus { border-color:var(--primary); }
-        .note-toolbar { display:flex; gap:10px; }
-        .note-toolbar button { flex:1; }
-        .btn-danger { background:#EF4444; color:white; padding:10px 16px; border-radius:24px; font-weight:600; }
-        .note-hint { font-size:0.85rem; color:var(--text-secondary); line-height:1.6; }
-        .note-hint code { background:var(--muted); padding:1px 6px; border-radius:6px; font-family:ui-monospace,monospace; font-size:0.8rem; }
-
         @media (prefers-reduced-motion: reduce) { * { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
     </style>
 </head>
@@ -220,7 +210,6 @@
     <button class="nav-item" data-view="wordbook" onclick="switchView('wordbook')"><span>📖</span>单词本</button>
     <button class="nav-item" data-view="review" onclick="switchView('review')"><span>✏️</span>复习</button>
     <button class="nav-item" data-view="wrong" onclick="switchView('wrong')"><span>📕</span>错题</button>
-    <button class="nav-item" data-view="note" onclick="switchView('note')"><span>📝</span>记事本</button>
     <button class="nav-item" data-view="profile" onclick="switchView('profile')"><span>👤</span>我的</button>
 </nav>
 <div id="toast"></div>
@@ -527,7 +516,6 @@
     /* 答题防抖锁：防止连点导致跳题 */
     let answering = false;
     let currentView = 'search';
-    let noteDirty = false;  // 记事本是否有未保存修改
     let currentSearchWord = null;
     let reviewQueue = [];
     let reviewIndex = 0;
@@ -838,12 +826,6 @@
     }
 
     function switchView(view) {
-        // 离开记事本时自动保存未保存内容
-        if (currentView === 'note' && view !== 'note' && noteDirty) {
-            const ta = document.getElementById('noteArea');
-            if (ta) apiPost('/api/note', { content: ta.value });
-            noteDirty = false;
-        }
         currentView = view;
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
         document.querySelector(`[data-view="${view}"]`).classList.add('active');
@@ -868,58 +850,11 @@
         if (view === 'wordbook') await renderWordbook(container);
         if (view === 'review') await renderReview(container);
         if (view === 'wrong') await renderWrongBook();
-        if (view === 'note') await renderNote(container);
         if (view === 'profile') await renderProfile(container);
         requestAnimationFrame(() => container.classList.remove('fade-out'));
     }
 
-    // ---------- 记事本 ----------
-    async function renderNote(container) {
-        let content = '';
-        try { const r = await apiGet('/api/note'); content = r.content || ''; } catch (e) {}
-        container.innerHTML = `
-            <div class="card">
-                <h3>📝 记事本</h3>
-                <div class="note-hint" style="margin-top:6px;">粘贴从 AI 复制的单词 JSON 或任意文本，可随时保存、一键导入。</div>
-            </div>
-            <div class="card">
-                <textarea id="noteArea" class="note-textarea" placeholder="在此粘贴或输入内容…（支持直接粘贴 AI 生成的单词 JSON）"></textarea>
-                <div class="note-toolbar" style="margin-top:12px;">
-                    <button class="btn-primary" onclick="saveNote()">💾 保存</button>
-                    <button class="btn-success" onclick="importNote()">📥 一键导入单词本</button>
-                    <button class="btn-danger" onclick="clearNote()">🗑️ 清空</button>
-                </div>
-                <div class="note-hint" style="margin-top:12px;">💡 若内容是含 <code>user_words</code> 的单词 JSON，点「一键导入」即可直接加入单词本。</div>
-            </div>
-        `;
-        // 用 JS 赋值避免 HTML 转义问题
-        const ta = document.getElementById('noteArea');
-        if (ta) ta.value = content;
-        noteDirty = false;
-    }
-
-    function onNoteInput() { noteDirty = true; }
-
-    async function saveNote() {
-        const ta = document.getElementById('noteArea');
-        if (!ta) return;
-        try { await apiPost('/api/note', { content: ta.value }); noteDirty = false; showToast('已保存'); }
-        catch (e) { showToast('保存失败'); }
-    }
-
-    // 清空记事本（确认后清空并保存空内容）
-    function clearNote() {
-        const ta = document.getElementById('noteArea');
-        if (!ta) return;
-        showConfirm('🗑️ 清空记事本', '确定清空记事本的所有内容吗？清空后立即保存，无法恢复。', async () => {
-            ta.value = '';
-            noteDirty = false;
-            try { await apiPost('/api/note', { content: '' }); showToast('已清空'); }
-            catch (e) { showToast('清空失败'); }
-        });
-    }
-
-    /* ---- 导入单词（公共逻辑：记事本与单词本页面共用） ---- */
+    /* ---- 导入单词（单词本页面「📥 导入单词」弹窗使用） ---- */
     // 解析导入 JSON 文本，不合法时提示并返回 null
     function parseImportJson(text) {
         const t = (text || '').trim();
@@ -943,14 +878,6 @@
         } else {
             showToast('导入失败：' + (res.error || '未知错误'));
         }
-    }
-    async function importNote() {
-        const ta = document.getElementById('noteArea');
-        if (!ta) return;
-        const data = parseImportJson(ta.value);
-        if (!data) return;
-        // 复用列表选择器：选"全部"或指定列表后导入
-        showListPicker('📥 导入到', (listId) => importWordsData(data, listId));
     }
     // 单词本页面的「导入单词」弹窗
     function openImportWordsModal() {
