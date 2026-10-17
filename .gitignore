@@ -44,3 +44,7 @@ Thumbs.db
 
 # ===== æœ¬åœ° gh çŠ¶æ€ =====
 .local/
+
+# ===== Ç©ÃûÃÜÔ¿£¨½ûÖ¹Èë¿â£© =====
+android-app/*.keystore
+android-app/*.jks
