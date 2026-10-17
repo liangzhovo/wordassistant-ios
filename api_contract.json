@@ -1,5 +1,5 @@
 {
-  "_comment": "单词助手 27 个接口的单一契约。三端后端共同遵守：app.py（桌面+Android 同一文件，由 scripts/sync_all.py 同步）与 ios-app/WordAssistant/Api.swift（Swift 移植）。新增/修改接口必须同时更新此文件，并运行 python scripts/check_swift_coverage.py 校验 Swift 覆盖。响应 keys 为顶层键（尽力而为，以 app.py 为准）。",
+  "_comment": "单词助手 27 个接口的单一契约。三端后端共同遵守：app.py（桌面+Android 同一文件，由 脚本/sync_all.py 同步）与 ios-app/WordAssistant/Api.swift（Swift 移植）。新增/修改接口必须同时更新此文件，并运行 python 脚本/check_swift_coverage.py 校验 Swift 覆盖。响应 keys 为顶层键（尽力而为，以 app.py 为准）。",
   "endpoints": [
     { "method": "GET", "path": "/api/study_log/month", "query": ["month"], "responseKeys": ["<date>:{add,review}"] },
     { "method": "GET", "path": "/api/lists", "responseKeys": ["<list>[]"] },

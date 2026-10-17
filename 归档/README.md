@@ -1,4 +1,4 @@
-# archive · 历史脚本与文档（已归档）
+# 归档 · 历史脚本与文档（已归档）
 
 这里存放**已废弃**的构建脚本与文档，仅供查阅历史，**不要使用**。
 
@@ -15,7 +15,7 @@
 | 文件 | 废弃原因 |
 |---|---|
 | `README.md` / `BUILD_INSTRUCTIONS.md` / `BUILD_INSTRUCTIONS_ANDROID_STUDIO.md` | 旧架构（NanoHTTPD/8080 端口）说明，当前架构为 Chaquopy + Flask（5000 端口） |
-| `BUILD_INSTRUCTIONS_PYTHON.md` / `README_PYTHON.md` | 早期 Chaquopy 文档，已由 `docs/README.md`（单一代码源章节）与 `docs/BUILD.md`（构建操作手册）取代 |
+| `BUILD_INSTRUCTIONS_PYTHON.md` / `README_PYTHON.md` | 早期 Chaquopy 文档，已由 `文档/README.md`（单一代码源章节）与 `文档/BUILD.md`（构建操作手册）取代 |
 
 ## 当前唯一构建入口
 
@@ -23,4 +23,4 @@
 - **iOS IPA（CI）**：`python build.py`（构建控制台，可触发/观看/下载）
 - **桌面版**：`启动.bat`（`python app.py`）
 
-详见 [docs/BUILD.md](../docs/BUILD.md)。
+详见 [文档/BUILD.md](../文档/BUILD.md)。

@@ -7,7 +7,7 @@ on:
     paths:
       - 'index.html'                          # 唯一前端源
       - 'app.py'                              # 唯一 Python 后端源
-      - 'scripts/**'                          # 三端同步/契约校验脚本
+      - '脚本/**'                          # 三端同步/契约校验脚本
       - 'api_contract.json'                   # 接口契约
       - 'ios-app/**'
       - '.github/workflows/build-ipa.yml'
@@ -38,8 +38,8 @@ jobs:
 
       - name: Sync single-source assets (repo root -> platform copies)
         run: |
-          python3 scripts/sync_all.py --check || { echo "前端/后端副本过期，先运行同步并提交生成文件"; exit 1; }
-          python3 scripts/check_swift_coverage.py || { echo "Swift 后端未覆盖接口契约"; exit 1; }
+          python3 脚本/sync_all.py --check || { echo "前端/后端副本过期，先运行同步并提交生成文件"; exit 1; }
+          python3 脚本/check_swift_coverage.py || { echo "Swift 后端未覆盖接口契约"; exit 1; }
         shell: bash
 
       - name: Install XcodeGen

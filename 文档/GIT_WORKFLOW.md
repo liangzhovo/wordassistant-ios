@@ -76,16 +76,16 @@ cd /d E:\代码集合地\单词助手
 
 :: 0) 单一代码源：只改根目录 index.html / app.py / api_contract.json，
 ::    先同步生成三端副本（Android assets/python、iOS Resources），再一起提交
-python scripts\sync_all.py --check
-python scripts\sync_all.py
+python 脚本\sync_all.py --check
+python 脚本\sync_all.py
 
 :: 1) 查看改动
 git status
 git diff --stat
 
 :: 2) 暂存（只加想提交的文件；注意中文文件名要加引号）
-git add -- "index.html" "app.py" "scripts/sync_all.py" "scripts/make_index.py" ^
-         "scripts/check_swift_coverage.py" "scripts/smoke_api.py" "api_contract.json" ^
+git add -- "index.html" "app.py" "脚本/sync_all.py" "脚本/make_index.py" ^
+         "脚本/check_swift_coverage.py" "脚本/smoke_api.py" "api_contract.json" ^
          "android-app/app/src/main/assets/index.html" "android-app/app/src/main/python/app.py" ^
          "ios-app/WordAssistant/Resources/index.html"
 
@@ -102,7 +102,7 @@ git push origin main
 
 **不该提交的东西**（已在 `.gitignore`，或保持 untracked）：
 - `dist/`（构建产物）
-- `data/简明英汉字典增强版.db`（108MB 词典，走 Release 不放仓库；本地运行用）
+- `数据/简明英汉字典增强版.db`（108MB 词典，走 Release 不放仓库；本地运行用）
 - `_diag_*.py` / `diag*.txt` / `rebuild*.txt` / `*.db.small.new`（临时诊断文件）
 - `.local/`（gh 本地状态）
 
@@ -184,8 +184,8 @@ curl -L -o WordAssistant-unsigned.ipa ^
 | 构建失败 `Xcode project file format (77)` | XcodeGen 新格式；工作流已用 perl 强制 `objectVersion = 56` |
 | iLoader 报 `No Payload directory` | IPA zip 根缺 Payload/；工作流已修正并从 CI 校验 |
 | 手机上全部词搜不到（404） | `Bundle.main.url(forResource: 中文名)` 真机 miss → 已加 .db 枚举兜底 + 坏库重拷（提交 18e84f1） |
-| CI 报"前端/后端副本过期" | 改了根目录 `index.html`/`app.py` 没跑 `python scripts\sync_all.py`；同步后再提交生成文件 |
-| CI 报"Swift 后端未覆盖契约" | 新增/改了接口没更新 `api_contract.json` 或没移植 `Api.swift`；跑 `python scripts\check_swift_coverage.py` 看缺口 |
+| CI 报"前端/后端副本过期" | 改了根目录 `index.html`/`app.py` 没跑 `python 脚本\sync_all.py`；同步后再提交生成文件 |
+| CI 报"Swift 后端未覆盖契约" | 新增/改了接口没更新 `api_contract.json` 或没移植 `Api.swift`；跑 `python 脚本\check_swift_coverage.py` 看缺口 |
 | Release 词典 asset 叫 default.db | GitHub 对中文文件名改名，正常；fetch-db.sh 按 *.db 兜底 |
 | IPA 大小 47MB / 词典 103MB | 正确（ECDICT v2 完整版压缩后如此）；旧版 174MB 是 488MB 老词典，已废弃 |
 

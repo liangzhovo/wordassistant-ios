@@ -3,8 +3,8 @@
 """桌面端（Windows）冒烟测试：验证统一后的 app.py（三端唯一后端源）核心接口行为。
 
 用法：
-  python scripts/smoke_api.py                    # 用仓库根目录词典的临时副本测试
-  python scripts/smoke_api.py <词典路径>          # 指定词典（完整版或精简版 .small 均可）
+  python 脚本/smoke_api.py                    # 用 数据/ 词典的临时副本测试
+  python 脚本/smoke_api.py <词典路径>          # 指定词典（完整版或精简版 .small 均可）
 
 说明：
   - 在临时目录复制词典，测试完自动清理，绝不动原词典；
@@ -38,7 +38,7 @@ def check(name, cond, extra=""):
 
 
 def main():
-    src_db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "data", "简明英汉字典增强版.db")
+    src_db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "数据", "简明英汉字典增强版.db")
     if not os.path.exists(src_db):
         print(f"[错误] 词典不存在: {src_db}")
         return 2

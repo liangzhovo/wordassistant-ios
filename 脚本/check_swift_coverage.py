@@ -3,8 +3,8 @@
 """校验 iOS Swift 后端与 Python 后端是否覆盖 api_contract.json 的全部接口。
 
 用法：
-  python scripts/check_swift_coverage.py          # 校验并报告（有缺口退出码 1）
-  python scripts/check_swift_coverage.py --strict # 严格模式：responseKeys 也要求 Python 侧存在
+  python 脚本/check_swift_coverage.py          # 校验并报告（有缺口退出码 1）
+  python 脚本/check_swift_coverage.py --strict # 严格模式：responseKeys 也要求 Python 侧存在
 
 原理（启发式，用于抓「漏实现/漂移」）：
   - Python 侧：解析 app.py 的 @app.route 装饰器，按 method+path 与契约逐条比对；

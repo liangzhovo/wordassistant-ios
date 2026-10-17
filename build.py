@@ -15,8 +15,8 @@
   3. 下载最新 IPA 到 dist/
   4. 查看 Release 状态（data-v1 词典 / ipa-latest）
   5. 打开 GitHub Actions 网页
-  6. 三端同步 + 契约检查（scripts/sync_all.py）
-  7. 桌面接口冒烟测试（scripts/smoke_api.py，29 项）
+  6. 三端同步 + 契约检查（脚本/sync_all.py）
+  7. 桌面接口冒烟测试（脚本/smoke_api.py，29 项）
   8. 构建 Android APK（新窗口运行 一键构建APK.bat）
   9. 启动桌面版（python app.py）
 """
@@ -173,12 +173,12 @@ def action_open_web():
 
 def action_sync():
     """三端同步 + 契约检查。"""
-    return run([sys.executable, os.path.join("scripts", "sync_all.py"), "--check"])
+    return run([sys.executable, os.path.join("脚本", "sync_all.py"), "--check"])
 
 
 def action_smoke():
     """桌面接口冒烟测试。"""
-    return run([sys.executable, os.path.join("scripts", "smoke_api.py")])
+    return run([sys.executable, os.path.join("脚本", "smoke_api.py")])
 
 
 def action_android():

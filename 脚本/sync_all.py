@@ -13,9 +13,9 @@
   index.html -> ios-app/WordAssistant/Resources/index.html        （make_index 转换）
 
 用法：
-  python scripts/sync_all.py            # 执行同步（覆盖三个副本）
-  python scripts/sync_all.py --check    # 只校验漂移，不写入（有漂移退出码 1）
-  python scripts/sync_all.py --check --report   # 校验并打印每个文件的差异摘要
+  python 脚本/sync_all.py            # 执行同步（覆盖三个副本）
+  python 脚本/sync_all.py --check    # 只校验漂移，不写入（有漂移退出码 1）
+  python 脚本/sync_all.py --check --report   # 校验并打印每个文件的差异摘要
 """
 import io
 import os
@@ -126,7 +126,7 @@ def main():
         if not CHECK:
             print("已同步完成。请重新运行 --check 确认，并提交全部生成文件。")
         else:
-            print("提示：运行 python scripts/sync_all.py 完成同步。")
+            print("提示：运行 python 脚本/sync_all.py 完成同步。")
         return 1
     if CHECK and not _coverage_ok:
         print("契约覆盖检查未通过（见上方报告）。")

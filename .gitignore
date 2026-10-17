@@ -11,10 +11,10 @@ android-app/local.properties
 *.apk
 *.aab
 
-# ===== 大词典文件（data/ 下；完整版由 GitHub Release 提供，CI 自动下载；精简版入库）=====
-data/简明英汉字典增强版.db
-data/简明英汉字典增强版.db.bak
-data/简明英汉字典增强版.db.bak2
+# ===== 大词典文件（数据/ 下；完整版由 GitHub Release 提供，CI 自动下载；精简版入库）=====
+数据/简明英汉字典增强版.db
+数据/简明英汉字典增强版.db.bak
+数据/简明英汉字典增强版.db.bak2
 android-app/app/src/main/assets/简明英汉字典增强版.db
 
 # ===== iOS =====

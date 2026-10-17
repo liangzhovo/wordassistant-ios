@@ -3,9 +3,9 @@
 1) apiPost 的 body 改走 query 参数（WKURLSchemeHandler 收不到 POST body）
 2) fmtTrans 去掉 lookbehind 正则（iOS 15/16 引擎不支持）
 
-本文件同时被 scripts/sync_all.py 复用（transform 函数），也可单独运行：
-  python scripts/make_index.py            # 读取根 index.html，写入 ios Resources
-  python scripts/make_index.py --check    # 只校验转换结果是否与现有 iOS 文件一致
+本文件同时被 脚本/sync_all.py 复用（transform 函数），也可单独运行：
+  python 脚本/make_index.py            # 读取根 index.html，写入 ios Resources
+  python 脚本/make_index.py --check    # 只校验转换结果是否与现有 iOS 文件一致
 """
 import io
 import os
@@ -46,7 +46,7 @@ def main():
         if cur == out:
             print("OK: iOS 版 index.html 与根目录源一致（无漂移）")
             return 0
-        print("DIFF: iOS 版 index.html 过期，需重新生成（运行 scripts/sync_all.py）")
+        print("DIFF: iOS 版 index.html 过期，需重新生成（运行 脚本/sync_all.py）")
         return 1
 
     with io.open(DST, "w", encoding="utf-8", newline="\n") as f:

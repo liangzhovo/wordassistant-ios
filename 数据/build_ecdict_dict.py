@@ -12,15 +12,15 @@ paraphrase 统一格式（每行一个词性组，第一行为最常用义项）
   ...
 示例：about -> [ә'baut]prep. 在...周围, 大约, 有关, 关于\nadv. 大约, 四处, 在附近, 周围
 
-用法：python data/build_ecdict_dict.py [ecdict.csv 路径]
+用法：python 数据/build_ecdict_dict.py [ecdict.csv 路径]
 """
 import csv, os, re, sqlite3, sys, time
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-ROOT = os.path.dirname(os.path.abspath(__file__))          # 脚本位于 data/，ROOT 即 data/
+ROOT = os.path.dirname(os.path.abspath(__file__))          # 脚本位于 数据/，ROOT 即 数据/
 REPO = os.path.dirname(ROOT)                                 # 仓库根目录
-FULL = os.path.join(ROOT, '简明英汉字典增强版.db.new')      # 先输出 .new，验证后替换（词典存 data/）
+FULL = os.path.join(ROOT, '简明英汉字典增强版.db.new')      # 先输出 .new，验证后替换（词典存 数据/）
 SMALL = os.path.join(REPO, 'android-app', 'app', 'src', 'main', 'assets', '简明英汉字典增强版.db.small.new')
 
 # 词条类型/变体标注（exchange 字段展开用）

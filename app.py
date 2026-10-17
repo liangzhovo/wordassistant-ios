@@ -4,7 +4,7 @@ from datetime import datetime
 import os, re, threading, time
 import sys
 
-# ===== 桌面端与 Android 端共用同一份 app.py（由 scripts/sync_all.py 同步到 Android）=====
+# ===== 桌面端与 Android 端共用同一份 app.py（由 脚本/sync_all.py 同步到 Android）=====
 # Android（Chaquopy）没有 pywebview，导入失败时置空，桌面端 __main__ 才使用。
 try:
     import webview
@@ -14,8 +14,8 @@ except ImportError:
 app = Flask(__name__, static_folder='.', static_url_path='')
 
 # 数据库路径：由 Android 端 MainActivity 启动时通过 set_db_path() 注入；
-# 桌面端默认取 data/ 下的词典（旧布局：词典在仓库根目录时自动兼容）
-_DEFAULT_DB = os.path.join("data", "简明英汉字典增强版.db")
+# 桌面端默认取 数据/ 下的词典（旧布局：词典在仓库根目录时自动兼容）
+_DEFAULT_DB = os.path.join("数据", "简明英汉字典增强版.db")
 if not os.path.exists(_DEFAULT_DB) and os.path.exists("简明英汉字典增强版.db"):
     _DEFAULT_DB = "简明英汉字典增强版.db"
 DB_PATH = _DEFAULT_DB

@@ -8,15 +8,15 @@ rem 若用 UTF-8 另存会导致中文乱码、命令错乱，请勿随意改编码。
 cd /d "%~dp0"
 
 rem ---- 单一代码源同步：从仓库根同步 Android 前端/后端（改根目录代码，构建前自动生效）----
-if exist "..\scripts\sync_all.py" (
-    python "..\scripts\sync_all.py"
+if exist "..\脚本\sync_all.py" (
+    python "..\脚本\sync_all.py"
     if errorlevel 1 (
         echo [错误] 同步脚本执行失败，请检查根目录 index.html / app.py 是否完整。
         pause
         exit /b 1
     )
 ) else (
-    echo [警告] 未找到 ..\scripts\sync_all.py，跳过同步（请确认脚本存在）。
+    echo [警告] 未找到 ..\脚本\sync_all.py，跳过同步（请确认脚本存在）。
 )
 
 
