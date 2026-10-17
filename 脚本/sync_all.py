@@ -51,6 +51,8 @@ ANDROID_HTML = os.path.join(ROOT, "android-app", "app", "src", "main", "assets",
 IOS_HTML = os.path.join(ROOT, "ios-app", "WordAssistant", "Resources", "index.html")
 BACKEND_SRC = os.path.join(ROOT, "app.py")
 ANDROID_PY = os.path.join(ROOT, "android-app", "app", "src", "main", "python", "app.py")
+FSRS_SRC = os.path.join(ROOT, "fsrs.py")
+ANDROID_FSRS = os.path.join(ROOT, "android-app", "app", "src", "main", "python", "fsrs.py")
 
 
 def read(p):
@@ -101,6 +103,7 @@ def main():
     pairs = [
         ("Android 前端 (assets/index.html)", FRONTEND_SRC, ANDROID_HTML, sync_copy),
         ("Android 后端 (python/app.py)", BACKEND_SRC, ANDROID_PY, sync_copy),
+        ("Android 后端 (python/fsrs.py)", FSRS_SRC, ANDROID_FSRS, sync_copy),
         ("iOS 前端 (Resources/index.html)", FRONTEND_SRC, IOS_HTML, sync_ios),
     ]
     dirty = []

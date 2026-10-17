@@ -232,19 +232,34 @@ enum Api {
 
     static func getReview(_ query: [String: String]) throws -> APIResponse {
         let listId = Int(query["list_id"] ?? "")
+        let limit = Int(query["limit"] ?? "") ?? 20
         let db = try openDB()
         defer { sqlite3_close(db) }
         let rows: [[String: Any]]
         if let listId {
             rows = DB.query(db, """
-                SELECT word FROM user_words WHERE list_id = ? AND mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now')) ORDER BY next_review ASC LIMIT 20
+                SELECT word, stability, reviewed_at, forget_count, julianday('now') - julianday(reviewed_at) AS elapsed
+                FROM user_words WHERE list_id = ? AND mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now'))
+                ORDER BY next_review ASC
             """, [listId])
         } else {
             rows = DB.query(db, """
-                SELECT word FROM user_words WHERE mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now')) ORDER BY next_review ASC LIMIT 20
+                SELECT word, stability, reviewed_at, forget_count, julianday('now') - julianday(reviewed_at) AS elapsed
+                FROM user_words WHERE mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now'))
+                ORDER BY next_review ASC
             """)
         }
-        return .json(rows.map { $0["word"] ?? "" })
+        let wrongWords = Set(DB.query(db, "SELECT word FROM wrong_book").compactMap { $0["word"] as? String })
+        // 错题本词无条件优先；组内按 FSRS 遗忘风险 R 升序（最可能遗忘排前）
+        let scored = rows.map { row -> (word: String, key: (Int, Double)) in
+            let word = row["word"] as? String ?? ""
+            let elapsed = (row["elapsed"] as? Double) ?? 0
+            let s = row["stability"] as? Double
+            let r = (s != nil && s! > 0) ? Utils.fsrsForgettingCurve(elapsedDays: max(elapsed, 0), stability: s!) : 1.0
+            let forgetPenalty = (row["forget_count"] as? Double ?? 0) * 0.02
+            return (word, (wrongWords.contains(word) ? 0 : 1, r - forgetPenalty))
+        }.sorted { $0.key < $1.key }
+        return .json(Array(scored.prefix(limit)).map { $0.word })
     }
 
     static func reviewResult(_ body: [String: Any]?) throws -> APIResponse {
@@ -277,24 +292,42 @@ enum Api {
             listId = (r?["list_id"] as? Int) ?? 1
         }
 
-        var row = DB.query(db, "SELECT review_count, forget_count, mastered, easiness_factor, interval FROM user_words WHERE word = ? AND list_id = ?", [word, listId]).first
+        var row = DB.query(db, "SELECT review_count, forget_count, mastered, easiness_factor, interval, stability, difficulty, reviewed_at FROM user_words WHERE word = ? AND list_id = ?", [word, listId]).first
         if row == nil {
             if let r2 = DB.query(db, "SELECT list_id FROM user_words WHERE word = ? LIMIT 1", [word]).first,
                let lid = r2["list_id"] as? Int {
                 listId = lid
-                row = DB.query(db, "SELECT review_count, forget_count, mastered, easiness_factor, interval FROM user_words WHERE word = ? AND list_id = ?", [word, listId]).first
+                row = DB.query(db, "SELECT review_count, forget_count, mastered, easiness_factor, interval, stability, difficulty, reviewed_at FROM user_words WHERE word = ? AND list_id = ?", [word, listId]).first
+            }
+        }
+
+        func recordTypeStats(_ qtype: String?, _ ok: Bool) {
+            guard let qtype = qtype, ["en_zh", "zh_en", "spell"].contains(qtype) else { return }
+            let raw = (DB.query(db, "SELECT value FROM settings WHERE key = 'type_stats'").first?["value"] as? String) ?? "{}"
+            var ts = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] ?? [:]
+            var arm = ts[qtype] as? [String: Any] ?? ["correct": 0, "wrong": 0]
+            let key = ok ? "correct" : "wrong"
+            arm[key] = (arm[key] as? Int ?? 0) + 1
+            ts[qtype] = arm
+            if let data = try? JSONSerialization.data(withJSONObject: ts),
+               let s = String(data: data, encoding: .utf8) {
+                _ = try? DB.exec(db, "INSERT OR REPLACE INTO settings (key, value) VALUES ('type_stats', ?)", [s])
             }
         }
 
         if row == nil {
             // 词不在任何列表：插入并记录错题
-            let fc = (!correct || forgot) ? 1 : 0
-            try DB.exec(db, "INSERT INTO user_words (word, list_id, forget_count, review_count) VALUES (?, ?, ?, 0)", [word, listId, fc])
-            if !correct || forgot {
+            let isCorrect = correct && !forgot
+            let initRating = isCorrect ? 3 : 1
+            let fc = isCorrect ? 0 : 1
+            try DB.exec(db, "INSERT INTO user_words (word, list_id, forget_count, review_count, stability, difficulty, reviewed_at) VALUES (?, ?, ?, 0, ?, ?, datetime('now'))",
+                        [word, listId, fc, Utils.fsrsInitStability(rating: initRating), Utils.fsrsInitDifficulty(rating: initRating)])
+            if !isCorrect {
                 try DB.exec(db, "INSERT INTO wrong_logs (word, list_id, reason, correct_answer, selected) VALUES (?, ?, ?, ?, ?)",
                             [word, listId, forgot ? "forgot" : "wrong", correctAnswer ?? "", selected ?? ""])
                 try upsertWrongBook(db, word: word, listId: listId, forgot: forgot, correctAnswer: correctAnswer, selected: selected, translation: translation)
             }
+            recordTypeStats(body["type"] as? String, isCorrect)
             DB.recordStudyLog("review")
             return .json(["success": true, "inserted": true])
         }
@@ -304,8 +337,21 @@ enum Api {
         var mastered = row?["mastered"] as? Int ?? 0
         let ef = row?["easiness_factor"] as? Double ?? 2.5
         let interval = row?["interval"] as? Int ?? 0
+        let stability = row?["stability"] as? Double
+        let difficulty = row?["difficulty"] as? Double
         let isCorrect = correct && !forgot
-        let (newEf, newInterval) = Utils.sm2Update(ef: ef, interval: interval, correct: isCorrect)
+        var elapsed: Double = 0
+        if let reviewedAt = row?["reviewed_at"] as? String {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            if let prev = f.date(from: String(reviewedAt.prefix(19))) {
+                elapsed = Date().timeIntervalSince(prev) / 86400.0
+            }
+        }
+        let fsrsOut = Utils.fsrsSchedule(correct: isCorrect, stability: stability, difficulty: difficulty, elapsedDays: elapsed)
+        let newEf = Utils.sm2Update(ef: ef, interval: interval, correct: isCorrect).ef  // 兼容字段
+        let newInterval = fsrsOut.interval
 
         if isCorrect {
             reviewCount += 1
@@ -329,9 +375,11 @@ enum Api {
                         [word, listId, forgot ? "forgot" : "wrong", correctAnswer ?? "", selected ?? ""])
             try upsertWrongBook(db, word: word, listId: listId, forgot: forgot, correctAnswer: correctAnswer, selected: selected, translation: translation)
         }
+        recordTypeStats(body["type"] as? String, isCorrect)
         try DB.exec(db, """
-            UPDATE user_words SET review_count=?, forget_count=?, mastered=?, easiness_factor=?, interval=?, next_review=datetime('now', ?) WHERE word=? AND list_id=?
-        """, [reviewCount, forgetCount, mastered, newEf, newInterval, isCorrect ? "+\(newInterval) day" : "+1 day", word, listId])
+            UPDATE user_words SET review_count=?, forget_count=?, mastered=?, easiness_factor=?, interval=?,
+            stability=?, difficulty=?, reviewed_at=datetime('now'), next_review=datetime('now', ?) WHERE word=? AND list_id=?
+        """, [reviewCount, forgetCount, mastered, newEf, newInterval, fsrsOut.s, fsrsOut.d, "+\(newInterval) day", word, listId])
         DB.recordStudyLog("review")
         return .json(["success": true])
     }
@@ -361,7 +409,8 @@ enum Api {
                 let defaults: [[String]] = [
                     ["review_mode", "learn"], ["exp", "0"], ["dailyLimit", "5"], ["autoLimit", "false"],
                     ["weights", #"{"en_zh":40,"zh_en":40,"spell":20}"#], ["autoAdapt", "false"], ["theme", "system"],
-                    ["reminder_enabled", "false"], ["reminder_time", "09:00"]
+                    ["reminder_enabled", "false"], ["reminder_time", "09:00"],
+                    ["type_stats", #"{"en_zh":{"correct":0,"wrong":0},"zh_en":{"correct":0,"wrong":0},"spell":{"correct":0,"wrong":0}}"#]
                 ]
                 try DB.exec(db, "DELETE FROM settings")
                 for kv in defaults {

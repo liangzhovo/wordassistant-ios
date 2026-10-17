@@ -1,8 +1,9 @@
 from flask import Flask, jsonify, request, send_from_directory
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import os, re, threading, time
 import sys
+import json
 
 # ===== 桌面端与 Android 端共用同一份 app.py（由 脚本/sync_all.py 同步到 Android）=====
 # Android（Chaquopy）没有 pywebview，导入失败时置空，桌面端 __main__ 才使用。
@@ -10,6 +11,9 @@ try:
     import webview
 except ImportError:
     webview = None
+
+# FSRS 间隔重复调度（根目录同目录文件，随 app.py 一起同步到 Android）
+import fsrs
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -123,6 +127,14 @@ def init_db():
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
     _add_col('user_words', 'easiness_factor', 'REAL DEFAULT 2.5')
     _add_col('user_words', 'interval', 'INTEGER DEFAULT 0')
+    # FSRS 记忆模型字段（stability 稳定性 / difficulty 难度 / reviewed_at 上次复习时间）
+    _add_col('user_words', 'stability', 'REAL')
+    _add_col('user_words', 'difficulty', 'REAL')
+    _add_col('user_words', 'reviewed_at', 'DATETIME')
+
+    # 题型统计（持久化，供题型自动适配/多臂老虎机使用）
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES "
+                 "('type_stats', '{\"en_zh\":{\"correct\":0,\"wrong\":0},\"zh_en\":{\"correct\":0,\"wrong\":0},\"spell\":{\"correct\":0,\"wrong\":0}}')")
 
     # 学习日志表
     conn.execute('''
@@ -387,15 +399,37 @@ def delete_word(word):
 @app.route('/api/review', methods=['GET'])
 def get_review_words():
     list_id = request.args.get('list_id', type=int)
+    limit = request.args.get('limit', type=int) or 20
     conn = get_db()
     cur = conn.cursor()
-    if list_id:
-        cur.execute("SELECT word FROM user_words WHERE list_id = ? AND mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now')) ORDER BY next_review ASC LIMIT 20", (list_id,))
-    else:
-        cur.execute("SELECT word FROM user_words WHERE mastered = 0 AND (next_review IS NULL OR next_review <= datetime('now')) ORDER BY next_review ASC LIMIT 20")
+    where_list = 'list_id = ? AND ' if list_id else ''
+    params = (list_id,) if list_id else ()
+    # 到期词 + FSRS 可提取性（elapsed 天）；错题本词无条件优先，再按遗忘风险 R 升序
+    q = (f"SELECT word, stability, reviewed_at, forget_count, "
+         f"julianday('now') - julianday(reviewed_at) AS elapsed "
+         f"FROM user_words WHERE {where_list}mastered = 0 "
+         f"AND (next_review IS NULL OR next_review <= datetime('now')) "
+         f"ORDER BY next_review ASC")
+    cur.execute(q, params)
     rows = cur.fetchall()
+    wrong_words = set()
+    try:
+        wrong_words = {r['word'] for r in cur.execute("SELECT word FROM wrong_book").fetchall()}
+    except Exception:
+        pass
+
+    def risk(row):
+        el = row['elapsed'] if row['elapsed'] is not None else 0
+        s = row['stability']
+        r = fsrs.forgetting_curve(max(el, 0.0), s) if s else 1.0
+        # 错题本词优先（组 0），组内按 R 升序（最可能遗忘的排前）
+        return (0 if row['word'] in wrong_words else 1,
+                r - (row['forget_count'] or 0) * 0.02)
+
+    rows.sort(key=risk)
+    words = [r['word'] for r in rows[:limit]]
     conn.close()
-    return jsonify([r['word'] for r in rows])
+    return jsonify(words)
 
 def sm2_update(ef, interval, correct):
     """SM-2 间隔重复算法，返回 (new_ef, new_interval_days)。
@@ -448,7 +482,7 @@ def review_result():
         cur.execute("SELECT list_id FROM user_words WHERE word = ? ORDER BY forget_count DESC LIMIT 1", (word,))
         r = cur.fetchone()
         list_id = r['list_id'] if r else 1
-    cur.execute("SELECT review_count, forget_count, mastered, easiness_factor, interval FROM user_words WHERE word = ? AND list_id = ?", (word, list_id))
+    cur.execute("SELECT review_count, forget_count, mastered, easiness_factor, interval, stability, difficulty, reviewed_at FROM user_words WHERE word = ? AND list_id = ?", (word, list_id))
     row = cur.fetchone()
     if not row:
         # 词不在该列表：找词的其他列表
@@ -456,34 +490,60 @@ def review_result():
         r2 = cur.fetchone()
         if r2:
             list_id = r2['list_id']
-            cur.execute("SELECT review_count, forget_count, mastered, easiness_factor, interval FROM user_words WHERE word = ? AND list_id = ?", (word, list_id))
+            cur.execute("SELECT review_count, forget_count, mastered, easiness_factor, interval, stability, difficulty, reviewed_at FROM user_words WHERE word = ? AND list_id = ?", (word, list_id))
             row = cur.fetchone()
+
+    def _record_type_stats(cur, qtype, ok):
+        """题型统计持久化（供题型自动适配/多臂老虎机使用）"""
+        if qtype not in ('en_zh', 'zh_en', 'spell'):
+            return
+        row0 = cur.execute("SELECT value FROM settings WHERE key='type_stats'").fetchone()
+        ts = json.loads((row0['value'] if row0 and row0['value'] else '{}') or '{}')
+        ts.setdefault(qtype, {'correct': 0, 'wrong': 0})
+        ts[qtype]['correct' if ok else 'wrong'] += 1
+        cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('type_stats', ?)",
+                    (json.dumps(ts, ensure_ascii=False),))
+
     if not row:
         # 词不在任何列表：插入（并记录错题）
-        cur.execute("INSERT INTO user_words (word, list_id, forget_count, review_count) VALUES (?, ?, ?, 0)",
-                    (word, list_id, 1 if (not correct or forgot) else 0))
-        if not correct or forgot:
+        is_correct = correct and not forgot
+        init_rating = 'good' if is_correct else 'again'
+        cur.execute("INSERT INTO user_words (word, list_id, forget_count, review_count, stability, difficulty, reviewed_at) VALUES (?, ?, ?, 0, ?, ?, datetime('now'))",
+                    (word, list_id, 1 if (not is_correct) else 0,
+                     fsrs.init_stability(init_rating), fsrs.init_difficulty(init_rating)))
+        if not is_correct:
             cur.execute("INSERT INTO wrong_logs (word, list_id, reason, correct_answer, selected) VALUES (?, ?, ?, ?, ?)",
                         (word, list_id, 'forgot' if forgot else 'wrong', correct_answer, selected))
             _upsert_wrong_book(cur, word, list_id, forgot, correct_answer, selected, data.get('translation'))
+        _record_type_stats(cur, data.get('type'), is_correct)
         conn.commit()
         conn.close()
         record_study_log('review')
         return jsonify({'success': True, 'inserted': True})
-    # 正常更新记忆曲线
+    # FSRS 记忆曲线更新（调度主逻辑）；SM-2 字段同步写入兼容保留
     review_count, forget_count, mastered = row['review_count'], row['forget_count'], row['mastered']
     ef = row['easiness_factor'] or 2.5
     interval = row['interval'] or 0
+    s = row['stability']
+    d = row['difficulty']
     is_correct = correct and not forgot
-    new_ef, new_interval = sm2_update(ef, interval, is_correct)
+    elapsed = 0.0
+    if row['reviewed_at']:
+        try:
+            prev = datetime.strptime(str(row['reviewed_at'])[:19], '%Y-%m-%d %H:%M:%S')
+            elapsed = (datetime.now() - prev).total_seconds() / 86400.0
+        except Exception:
+            elapsed = 0.0
+    new_s, new_d, fsrs_interval = fsrs.schedule(is_correct, s, d, elapsed)
+    new_ef, _ = sm2_update(ef, interval, is_correct)  # 兼容字段
     if is_correct:
         review_count += 1
         if forget_count > 0: forget_count = max(0, forget_count - 1)
         cur.execute("UPDATE settings SET value = CAST(value AS INTEGER) + 2 WHERE key = 'exp'")
-        # 连续答对且间隔达到 30 天以上视为已掌握
-        if new_interval >= 30:
+        # 间隔达到 30 天以上视为已掌握
+        if fsrs_interval >= 30:
             mastered = 1
-        next_review = f"+{new_interval} day"
+        next_review = f"+{fsrs_interval} day"
         # 错题本移除规则：连续答对 5 次才移除；答对一次只累加不删除
         cur.execute('''UPDATE wrong_book SET correct_streak = correct_streak + 1, last_wrong = datetime('now')
                        WHERE word = ? AND list_id = ?''', (word, list_id))
@@ -495,14 +555,17 @@ def review_result():
         forget_count += 1
         review_count = max(0, review_count - 1)
         mastered = 0
-        next_review = "+1 day"
+        next_review = f"+{fsrs_interval} day"
         # 记录错因
         cur.execute("INSERT INTO wrong_logs (word, list_id, reason, correct_answer, selected) VALUES (?, ?, ?, ?, ?)",
                     (word, list_id, 'forgot' if forgot else 'wrong', correct_answer, selected))
         # 加入错题本
         _upsert_wrong_book(cur, word, list_id, forgot, correct_answer, selected, data.get('translation'))
-    cur.execute('''UPDATE user_words SET review_count=?, forget_count=?, mastered=?, easiness_factor=?, interval=?, next_review=datetime('now', ?) WHERE word=? AND list_id=?''',
-                (review_count, forget_count, mastered, new_ef, new_interval, next_review, word, list_id))
+    _record_type_stats(cur, data.get('type'), is_correct)
+    cur.execute('''UPDATE user_words SET review_count=?, forget_count=?, mastered=?, easiness_factor=?, interval=?,
+                   stability=?, difficulty=?, reviewed_at=datetime('now'), next_review=datetime('now', ?)
+                   WHERE word=? AND list_id=?''',
+                (review_count, forget_count, mastered, new_ef, fsrs_interval, new_s, new_d, next_review, word, list_id))
     conn.commit()
     conn.close()
     

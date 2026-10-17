@@ -16,6 +16,7 @@ import os
 import shutil
 import sys
 import tempfile
+import json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -93,17 +94,26 @@ def main():
         # ---- 复习 ----
         c.post("/api/wordbook", json={"word": "book", "list_id": 1})
         r = c.post("/api/review/result",
-                   json={"word": "book", "list_id": 1, "correct": True, "correct_answer": "book",
-                         "translation": "n. 书"})
+                   json={"word": "book", "list_id": 1, "correct": True, "type": "en_zh",
+                         "correct_answer": "book", "translation": "n. 书"})
         check("POST review/result 正确", (r.get_json(silent=True) or {}).get("success") is True)
         r = c.post("/api/review/result",
-                   json={"word": "book", "list_id": 1, "correct": False, "selected": "wrong",
+                   json={"word": "book", "list_id": 1, "correct": False, "type": "spell", "selected": "wrong",
                          "correct_answer": "book", "translation": "n. 书"})
         check("POST review/result 错误入错题本", (r.get_json(silent=True) or {}).get("success") is True)
+        # FSRS / type_stats 持久化验证（直接读临时库）
+        import sqlite3 as _sq
+        _conn = _sq.connect(db)
+        _fs = _conn.execute("SELECT stability, difficulty, reviewed_at FROM user_words WHERE word='book'").fetchone()
+        check("FSRS 字段已写入 (stability>0)", _fs is not None and (_fs[0] or 0) > 0 and _fs[2] is not None)
+        _ts = json.loads(_conn.execute("SELECT value FROM settings WHERE key='type_stats'").fetchone()[0] or '{}')
+        check("type_stats 累计 (en_zh.correct=1)", _ts.get("en_zh", {}).get("correct") == 1)
+        check("type_stats 累计 (spell.wrong=1)", _ts.get("spell", {}).get("wrong") == 1)
+        _conn.close()
         r = c.get("/api/wordbook/wrong")
         wrong = r.get_json(silent=True) or []
         check("GET 错题本含 book", any(w.get("word", "").lower() == "book" for w in wrong))
-        r = c.get("/api/review")
+        r = c.get("/api/review?limit=5")
         check("GET review 返回数组", isinstance(r.get_json(silent=True), list))
         r = c.post("/api/review/finish")
         check("POST review/finish", (r.get_json(silent=True) or {}).get("success") is True)

@@ -206,19 +206,29 @@ enum DB {
         let defaults: [[String]] = [
             ["review_mode", "learn"], ["exp", "0"], ["dailyLimit", "5"], ["autoLimit", "false"],
             ["weights", #"{"en_zh":40,"zh_en":40,"spell":20}"#], ["autoAdapt", "false"], ["theme", "system"],
-            ["reminder_enabled", "false"], ["reminder_time", "09:00"]
+            ["reminder_enabled", "false"], ["reminder_time", "09:00"],
+            ["type_stats", #"{"en_zh":{"correct":0,"wrong":0},"zh_en":{"correct":0,"wrong":0},"spell":{"correct":0,"wrong":0}}"#]
         ]
         for kv in defaults {
             try exec(db, "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", [kv[0], kv[1]])
         }
 
-        // SM-2 字段兼容
+        // SM-2 / FSRS 字段兼容（旧库补列）
         let cols = query(db, "PRAGMA table_info(user_words)").compactMap { $0["name"] as? String }
         if !cols.contains("easiness_factor") {
             try exec(db, "ALTER TABLE user_words ADD COLUMN easiness_factor REAL DEFAULT 2.5")
         }
         if !cols.contains("interval") {
             try exec(db, "ALTER TABLE user_words ADD COLUMN interval INTEGER DEFAULT 0")
+        }
+        if !cols.contains("stability") {
+            try exec(db, "ALTER TABLE user_words ADD COLUMN stability REAL")
+        }
+        if !cols.contains("difficulty") {
+            try exec(db, "ALTER TABLE user_words ADD COLUMN difficulty REAL")
+        }
+        if !cols.contains("reviewed_at") {
+            try exec(db, "ALTER TABLE user_words ADD COLUMN reviewed_at DATETIME")
         }
 
         // 错题本移除规则：连续答对 5 次才移除（旧库补列）

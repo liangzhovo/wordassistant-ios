@@ -75,6 +75,85 @@ enum Utils {
         }
     }
 
+    // MARK: - FSRS 间隔重复调度（对应 Python fsrs.py，移植自 FSRS4Anki v6.1.1）
+
+    static let fsrsW: [Double] = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001,
+                                  1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014,
+                                  1.8729, 0.5425, 0.0912, 0.0658, 0.1542]
+    static let fsrsRequestRetention = 0.9
+    static let fsrsMaximumInterval = 36500
+    static let fsrsDecay = -fsrsW[20]
+    static let fsrsFactor = pow(0.9, 1 / fsrsDecay) - 1
+
+    /// 一次作答后的调度更新；correct=True -> good(3)，否则 again(1)
+    static func fsrsSchedule(correct: Bool, stability: Double?, difficulty: Double?, elapsedDays: Double) -> (s: Double, d: Double, interval: Int) {
+        let rating = correct ? 3 : 1
+        let newS: Double
+        let newD: Double
+        if let s = stability, let d = difficulty {
+            let r = fsrsForgettingCurve(elapsedDays: elapsedDays, stability: s)
+            if correct {
+                newS = fsrsNextRecallStability(difficulty: d, stability: s, r: r, rating: rating)
+            } else {
+                newS = fsrsNextForgetStability(difficulty: d, stability: s, r: r)
+            }
+            newD = fsrsNextDifficulty(d, rating: rating)
+        } else {
+            newS = fsrsInitStability(rating: rating)
+            newD = fsrsInitDifficulty(rating: rating)
+        }
+        return (round2(newS), round2(newD), fsrsNextInterval(newS))
+    }
+
+    private static func round2(_ x: Double) -> Double { (x * 100).rounded() / 100 }
+
+    static func fsrsInitStability(rating: Int) -> Double {
+        max(fsrsW[rating - 1], 0.1)
+    }
+
+    static func fsrsInitDifficulty(rating: Int) -> Double {
+        round2(fsrsConstrainDifficulty(fsrsW[4] - exp(fsrsW[5] * Double(rating - 1)) + 1))
+    }
+
+    static func fsrsForgettingCurve(elapsedDays: Double, stability: Double) -> Double {
+        if stability <= 0 || elapsedDays < 0 { return 1.0 }
+        return pow(1 + fsrsFactor * elapsedDays / stability, fsrsDecay)
+    }
+
+    static func fsrsNextInterval(_ stability: Double) -> Int {
+        let ivl = stability / fsrsFactor * (pow(fsrsRequestRetention, 1 / fsrsDecay) - 1)
+        return Int(min(max(ivl.rounded(), 1), Double(fsrsMaximumInterval)))
+    }
+
+    private static func fsrsConstrainDifficulty(_ d: Double) -> Double {
+        min(max((d * 100).rounded() / 100, 1), 10)
+    }
+
+    private static func fsrsLinearDamping(deltaD: Double, oldD: Double) -> Double {
+        deltaD * (10 - oldD) / 9
+    }
+
+    private static func fsrsMeanReversion(_ initV: Double, _ current: Double) -> Double {
+        fsrsW[7] * initV + (1 - fsrsW[7]) * current
+    }
+
+    static func fsrsNextDifficulty(_ d: Double, rating: Int) -> Double {
+        let deltaD = -fsrsW[6] * Double(rating - 3)
+        let nxt = d + fsrsLinearDamping(deltaD: deltaD, oldD: d)
+        return round2(fsrsConstrainDifficulty(fsrsMeanReversion(fsrsInitDifficulty(rating: 4), nxt)))
+    }
+
+    static func fsrsNextRecallStability(difficulty d: Double, stability s: Double, r: Double, rating: Int) -> Double {
+        let hardPenalty = rating == 2 ? fsrsW[15] : 1
+        let easyBonus = rating == 4 ? fsrsW[16] : 1
+        return s * (1 + exp(fsrsW[8]) * (11 - d) * pow(s, -fsrsW[9]) * (exp((1 - r) * fsrsW[10]) - 1) * hardPenalty * easyBonus)
+    }
+
+    static func fsrsNextForgetStability(difficulty d: Double, stability s: Double, r: Double) -> Double {
+        let sMin = s / exp(fsrsW[17] * fsrsW[18])
+        return min(fsrsW[11] * pow(d, -fsrsW[12]) * (pow(s + 1, fsrsW[13]) - 1) * exp((1 - r) * fsrsW[14]), sMin)
+    }
+
     /// 是否包含中文
     static func containsChinese(_ s: String) -> Bool {
         s.range(of: "[\\u4e00-\\u9fa5]", options: .regularExpression) != nil

@@ -1126,6 +1126,7 @@
     async function renderReview(container) {
         const config = await apiGet('/api/config');
         settings.review_mode = config.review_mode || 'learn';
+        applyTypeStats(config);
         if (config.weights) settings.weights = parseWeights(config.weights);
         if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
         if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
@@ -1159,18 +1160,44 @@
     async function setReviewList(id) { reviewListId = id; await renderReview(document.getElementById('viewContainer')); }
 
     function getCurrentWeights() {
-        let w = { en_zh: 40, zh_en: 40, spell: 20 };
         if (settings.autoAdapt) {
-            let en_zh_err = stats.en_zh.wrong > 0 ? stats.en_zh.wrong / (stats.en_zh.correct + stats.en_zh.wrong) : 0;
-            let zh_en_err = stats.zh_en.wrong > 0 ? stats.zh_en.wrong / (stats.zh_en.correct + stats.zh_en.wrong) : 0;
-            let spell_err = stats.spell.wrong > 0 ? stats.spell.wrong / (stats.spell.correct + stats.spell.wrong) : 0;
-            w.en_zh = Math.max(10, Math.round(en_zh_err * 100));
-            w.zh_en = Math.max(10, Math.round(zh_en_err * 100));
-            w.spell = Math.max(5, Math.round(spell_err * 100));
-            let total = w.en_zh + w.zh_en + w.spell;
-            if (total === 0) { w = { en_zh: 40, zh_en: 40, spell: 20 }; }
-        } else { w = settings.weights; }
-        return w;
+            // 多臂老虎机（Thompson sampling）：每题型按 Beta(correct+1, wrong+1) 后验抽样，
+            // 样本值比例即出题权重。统计来自后端持久化 type_stats（跨启动累计）。
+            const arms = ['en_zh', 'zh_en', 'spell'];
+            function betaSample(a, b) {
+                // a/b 为整数 → 用 Erlang（Gamma 整数形状）采样：a 个指数和 / (a 个 + b 个)
+                function gammaInt(k) { let x = 0; for (let i = 0; i < k; i++) x += -Math.log(1 - Math.random()); return x; }
+                const x = gammaInt(a), y = gammaInt(b);
+                return x / (x + y);
+            }
+            const samples = arms.map(t => {
+                const s = stats[t] || { correct: 0, wrong: 0 };
+                return betaSample((s.correct || 0) + 1, (s.wrong || 0) + 1);
+            });
+            const sum = samples.reduce((a, b) => a + b, 0);
+            const w = {};
+            arms.forEach((t, i) => { w[t] = sum > 0 ? Math.round(samples[i] / sum * 100) : (t === 'spell' ? 20 : 40); });
+            // 保底与归一化（和≈100）
+            Object.keys(w).forEach(t => { if (w[t] < 5) w[t] = 5; });
+            const tot = w.en_zh + w.zh_en + w.spell;
+            if (tot > 0) { const k = 100 / tot; w.en_zh = Math.round(w.en_zh * k); w.zh_en = Math.round(w.zh_en * k); w.spell = Math.max(5, 100 - w.en_zh - w.zh_en); }
+            return w;
+        }
+        return settings.weights || { en_zh: 40, zh_en: 40, spell: 20 };
+    }
+
+    /* 从后端配置加载持久化题型统计（跨启动累计，供 Thompson 使用） */
+    function applyTypeStats(config) {
+        if (config && config.type_stats) {
+            try {
+                const ts = JSON.parse(config.type_stats);
+                stats = {
+                    en_zh: Object.assign({ correct: 0, wrong: 0 }, ts.en_zh || {}),
+                    zh_en: Object.assign({ correct: 0, wrong: 0 }, ts.zh_en || {}),
+                    spell: Object.assign({ correct: 0, wrong: 0 }, ts.spell || {})
+                };
+            } catch (e) {}
+        }
     }
 
     function buildTasks(words) {
@@ -1246,8 +1273,8 @@
         let wordsToReview;
         if (customWords) { wordsToReview = customWords; }
         else {
-            if (reviewListId === 'all') { wordsToReview = await apiGet(`/api/review`); }
-            else { wordsToReview = await apiGet(`/api/review?list_id=${reviewListId}`); }
+            if (reviewListId === 'all') { wordsToReview = await apiGet(`/api/review?limit=${settings.dailyLimit}`); }
+            else { wordsToReview = await apiGet(`/api/review?list_id=${reviewListId}&limit=${settings.dailyLimit}`); }
             if (wordsToReview.length === 0) { wordsToReview = wordbook.filter(item => !item.mastered).map(item => item.word); let limit = settings.dailyLimit; if (settings.autoLimit) limit = Math.max(3, Math.min(10, wordsToReview.length)); wordsToReview = wordsToReview.slice(0, limit); }
         }
         if (wordsToReview.length === 0) { showToast('暂无需要复习的单词'); return; }
@@ -1336,7 +1363,7 @@
         currentQuestion.correct_answer = currentQuestion.stage === 0 ? fullTrans : word;
         currentQuestion.translation = data.translation;
         window.typeChar = (char) => { const input = document.getElementById('spellInput'); if (char === 'del') input.value = input.value.slice(0, -1); else if (char === 'space') input.value += ' '; else input.value += char; };
-        window.checkSpell = async () => { if (answering) return; answering = true; const input = document.getElementById('spellInput'); const ok = input.value.trim().toLowerCase() === word; if (ok) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: input.value, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 1000); } };
+        window.checkSpell = async () => { if (answering) return; answering = true; const input = document.getElementById('spellInput'); const ok = input.value.trim().toLowerCase() === word; if (ok) { correctCount++; stats[currentQuestion.type].correct++; input.style.color = '#10B981'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, type: currentQuestion.type, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 600); } else { stats[currentQuestion.type].wrong++; input.style.color = '#EF4444'; try { await apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, type: currentQuestion.type, selected: input.value, correct_answer: word, translation: currentQuestion.translation }); } catch(e) {} setTimeout(nextQuestion, 1000); } };
         // 保存复习进度（中断后可继续）
         saveReviewProgress();
     }
@@ -1344,8 +1371,8 @@
     window.checkAnswerByIndex = (index, el) => {
         if (answering) return; answering = true;
         const selected = window._currentAnswers[index]; const correct = window._currentCorrect;
-        if (selected === correct) { el.classList.add('correct'); correctCount++; stats[currentQuestion.type].correct++; apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 600); }
-        else { el.classList.add('wrong'); stats[currentQuestion.type].wrong++; document.querySelectorAll('.option[data-correct="true"]').forEach(b => { b.classList.add('correct'); b.disabled = true; }); apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, selected: selected, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 1500); }
+        if (selected === correct) { el.classList.add('correct'); correctCount++; stats[currentQuestion.type].correct++; apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: true, type: currentQuestion.type, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 600); }
+        else { el.classList.add('wrong'); stats[currentQuestion.type].wrong++; document.querySelectorAll('.option[data-correct="true"]').forEach(b => { b.classList.add('correct'); b.disabled = true; }); apiPost('/api/review/result', { word: currentQuestion.word, list_id: reviewListId, correct: false, type: currentQuestion.type, selected: selected, correct_answer: currentQuestion.correct_answer, translation: currentQuestion.translation }).catch(() => {}); setTimeout(nextQuestion, 1500); }
     };
 
     async function handleForgot() {
@@ -1357,7 +1384,7 @@
         try {
             const res = await apiPost('/api/review/result', {
                 word: word, list_id: reviewListId, forgot: true,
-                correct_answer: currentQuestion.correct_answer || word,
+                type: currentQuestion.type, correct_answer: currentQuestion.correct_answer || word,
                 translation: currentQuestion.translation
             });
             if (!res.success) { showToast('记录失败：' + (res.error || '未知错误')); }
@@ -1390,6 +1417,7 @@
 
         const config = await apiGet('/api/config');
         settings.review_mode = config.review_mode || 'learn';
+        applyTypeStats(config);
         if (config.weights) settings.weights = parseWeights(config.weights);
         if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
         if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
@@ -1646,6 +1674,7 @@
         if (config.last_list_id) { const lid = parseInt(config.last_list_id); if (!isNaN(lid) && lid > 0) currentListId = lid; }
         await loadWordbook();
         settings.review_mode = config.review_mode || 'learn';
+        applyTypeStats(config);
         if (config.weights) settings.weights = parseWeights(config.weights);
         if (config.autoAdapt) settings.autoAdapt = config.autoAdapt === 'true';
         if (config.dailyLimit) settings.dailyLimit = parseInt(config.dailyLimit);
