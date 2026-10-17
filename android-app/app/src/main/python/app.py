@@ -13,8 +13,12 @@ except ImportError:
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
-# 数据库路径：由 Android 端 MainActivity 启动时通过 set_db_path() 注入
-DB_PATH = "简明英汉字典增强版.db"
+# 数据库路径：由 Android 端 MainActivity 启动时通过 set_db_path() 注入；
+# 桌面端默认取 data/ 下的词典（旧布局：词典在仓库根目录时自动兼容）
+_DEFAULT_DB = os.path.join("data", "简明英汉字典增强版.db")
+if not os.path.exists(_DEFAULT_DB) and os.path.exists("简明英汉字典增强版.db"):
+    _DEFAULT_DB = "简明英汉字典增强版.db"
+DB_PATH = _DEFAULT_DB
 
 def set_db_path(path):
     """由 Android 端调用，注入数据库绝对路径"""

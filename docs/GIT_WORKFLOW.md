@@ -102,7 +102,7 @@ git push origin main
 
 **不该提交的东西**（已在 `.gitignore`，或保持 untracked）：
 - `dist/`（构建产物）
-- `简明英汉字典增强版.db`（103MB 词典，走 Release 不放仓库）
+- `data/简明英汉字典增强版.db`（108MB 词典，走 Release 不放仓库；本地运行用）
 - `_diag_*.py` / `diag*.txt` / `rebuild*.txt` / `*.db.small.new`（临时诊断文件）
 - `.local/`（gh 本地状态）
 

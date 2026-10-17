@@ -42,22 +42,30 @@ python scripts/sync_all.py            # 生成三端副本
 ## 目录结构
 
 ```
-（根目录 = 唯一代码源）
+（根目录 = 唯一代码源 + 操作入口）
 index.html                  # ★ 前端唯一源（桌面直接服务；Android/iOS 由此生成）
 app.py                      # ★ Python 后端唯一源（桌面 + Android Chaquopy 同一文件）
 api_contract.json           # ★ 27 接口契约（Swift 后端覆盖校验依据）
-scripts/
+build.py                    # 构建控制台（触发/观看/下载 iOS CI、Android、桌面）
+启动.bat                     # 桌面版启动（python app.py）
+scripts/                    # 工具脚本
 ├── sync_all.py             # ★ 一键三端同步 + --check 漂移校验（含契约检查）
 ├── make_index.py           # iOS 前端转换（POST body 走 query、去 lookbehind）
 ├── check_swift_coverage.py # 校验 Api.swift 是否覆盖契约全部接口
 └── smoke_api.py            # 桌面端接口冒烟测试（29 项，词典临时副本上执行）
-
-android-app/                # 构建时由 sync_all.py 注入 index.html / app.py 副本
-ios-app/
+data/                       # 词典与教材数据（大词典不入库，Release 提供）
+├── 简明英汉字典增强版.db   # 完整版词典（本地运行用，不入库）
+├── 7上.json / 8上.json / 9上.json   # 教材词数据
+└── build_ecdict_dict.py    # 词典构建脚本（ECDICT csv → db）
+docs/                       # 文档（本文档 / BUILD.md / GIT_WORKFLOW.md / 导入格式）
+archive/                    # 已废弃的历史脚本与文档（勿用）
+android-app/                # 源代码 · Android 工程（构建时由 sync_all.py 注入副本）
+ios-app/                    # 源代码 · iOS 工程
 ├── project.yml             # XcodeGen 工程定义（CI 用它生成 .xcodeproj）
 ├── scripts/
 │   ├── fetch-db.sh         # 下载/回退词典（CI 与本地共用）
 │   └── make_icons.py       # 由 Android 图标生成 iOS AppIcon
+├── BUILD_HANDOFF.md        # iOS 构建交接说明
 └── WordAssistant/
     ├── AppDelegate.swift
     ├── ViewController.swift    # WKWebView + JS 桥接（模拟 window.Android）+ 启动画面
@@ -77,8 +85,8 @@ ios-app/
 
 | 文件 | 大小 | 词条 | 说明 |
 |---|---|---|---|
-| `简明英汉字典增强版.db` | 488MB | 332 万 | **完整版**，不入库，由 GitHub Release (`data-v1`) 提供，CI 自动下载 |
-| `简明英汉字典增强版.db.small` | 82MB | 98 万 | **精简版**，随仓库提交，作为构建回退（功能一致） |
+| `data/简明英汉字典增强版.db` | 108MB | 77 万 | **完整版 v2**，不入库，本地运行/测试用 |
+| `简明英汉字典增强版.db.small` | 0.7MB | 3,758 | **学生精简版**，随仓库提交（android-app assets），作为构建回退 |
 
 `ios-app/scripts/fetch-db.sh` 的优先级：本地已有完整版 → Release 下载 → 回退精简库。
 首次在手机上启动时，应用会把词典复制到 App Support 并自动建索引（完整版约需 30~60 秒，有启动画面提示）。

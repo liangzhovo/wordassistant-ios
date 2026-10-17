@@ -76,7 +76,7 @@ python scripts\smoke_api.py   :: 29 项接口冒烟（词典临时副本，不�
 
 | 文件 | 内容 |
 |---|---|
-| `README.md` | 项目全貌 + 单一代码源章节 |
-| `GIT_WORKFLOW.md` | 提交/推送/Release/踩坑速查 |
+| `docs/README.md` | 项目全貌 + 单一代码源章节 |
+| `docs/GIT_WORKFLOW.md` | 提交/推送/Release/踩坑速查 |
 | `ios-app/BUILD_HANDOFF.md` | iOS 构建交接细节与验证清单 |
-| `android-app/legacy/` | 已废弃的历史脚本与文档（勿用） |
+| `archive/` | 已废弃的历史脚本与文档（勿用） |

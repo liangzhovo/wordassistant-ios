@@ -38,7 +38,7 @@ def check(name, cond, extra=""):
 
 
 def main():
-    src_db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "简明英汉字典增强版.db")
+    src_db = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "data", "简明英汉字典增强版.db")
     if not os.path.exists(src_db):
         print(f"[错误] 词典不存在: {src_db}")
         return 2

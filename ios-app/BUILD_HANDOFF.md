@@ -37,7 +37,7 @@
 | `android-app/app/src/main/assets/简明英汉字典增强版.db` | **ECDICT v2 完整版：768,999 词条 / 103.27 MB** | iOS 主词典 / 桌面 / Android | ❌ 太大，由 Release 提供 |
 | `android-app/app/src/main/assets/简明英汉字典增强版.db.small` | **学生核心：3,758 词条（中考 zk + 牛津三千 + 教材兜底）/ 0.72 MB** | CI 回退 / Android 精简 | ✅ 随仓库提交 |
 
-> 均由仓库根目录 `build_ecdict_dict.py` 从 `ecdict.csv` 构建（两遍法：原词优先插入、变体去重补充 + 教材词兜底）。
+> 均由仓库 `data/build_ecdict_dict.py` 从 `ecdict.csv` 构建（两遍法：原词优先插入、变体去重补充 + 教材词兜底）。
 
 ---
 
@@ -77,7 +77,7 @@
   - **发布后必须验证**：模拟器/真机安装 → 首次启动画面应**停留数秒~数十秒**（正在拷贝 103MB）→ 搜 `apple`/`good`/`a few` 均命中；已装旧 IPA 的用户需卸载重装（或新版本自动触发坏库重拷，`isValidDictionary(at:)` 已在工作区）。
 - **请确认这两个文件已提交/推送**（当前工作区为最新 v2 版本）：
   - `android-app/app/src/main/assets/简明英汉字典增强版.db.small`（757,760 bytes）
-  - `build_ecdict_dict.py`（两遍法 + 教材兜底）
+  - `data/build_ecdict_dict.py`（两遍法 + 教材兜底）
 - 若从全新 clone 构建：先 `git pull` 拿到上面文件（含 `Database.swift` 修复）→ 再执行第 3 节上传 → 构建。
 
 ---
@@ -128,7 +128,7 @@ xcodebuild archive \
   后端只改根目录 `app.py`（桌面 + Android 同一文件）。改完后**必须**运行 `python scripts\sync_all.py` 并提交全部生成文件；
 - **接口契约**：新增/修改接口先更新根目录 `api_contract.json`，再同步移植 `Api.swift`，
   用 `python scripts\check_swift_coverage.py` 校验 27 个接口两端都覆盖；CI 构建前也会做同样校验；
-- 词典由 `build_ecdict_dict.py` 从 `ecdict.csv`（ECDICT 原始数据，63 MB，见 [ECDICT 仓库](https://github.com/skywind3000/ECDICT)）可复现重建。
+- 词典由 `data/build_ecdict_dict.py` 从 `ecdict.csv`（ECDICT 原始数据，63 MB，见 [ECDICT 仓库](https://github.com/skywind3000/ECDICT)）可复现重建。
 
 ---
 
@@ -136,7 +136,7 @@ xcodebuild archive \
 
 | 文件 | 说明 |
 |---|---|
-| `build_ecdict_dict.py` | 从 `ecdict.csv` 构建 v2 完整版 + 精简版（两遍法 + 教材兜底） |
+| `data/build_ecdict_dict.py` | 从 `ecdict.csv` 构建 v2 完整版 + 精简版（两遍法 + 教材兜底） |
 | `upload-db.js` | 一键上传完整版到 GitHub Release `data-v1`（`--clobber` 覆盖） |
 | `ecdict.csv` | ECDICT 原始数据（63 MB，不在仓库内） |
 | `app.py` / `android-app/.../python/app.py` | 后端释义清洗，已对齐新格式（提交 `99de2c7`） |
