@@ -73,15 +73,15 @@
         /* 【新增】复习计划卡片收起/展开动画 */
         .plan-wrapper { overflow:hidden; transition:max-height 0.5s var(--ease-out), opacity 0.35s var(--ease-out), margin 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
 
-        /* 顶部加载进度条：短条从左滑到右，到终点后渐变消失（循环） */
+        /* 顶部加载进度条：整条从左端延伸到右端（增长到全宽），然后整体渐变消失（循环） */
         .loading-bar { position:fixed; top:0; left:0; right:0; height:3px; z-index:9999; opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
         .loading-bar.active { opacity:1; }
-        .loading-bar::before { content:''; position:absolute; top:0; bottom:0; width:35%; left:-40%; background:linear-gradient(90deg, transparent, var(--primary)); opacity:0; animation:loading-slide 1.5s linear infinite; }
+        .loading-bar::before { content:''; position:absolute; top:0; bottom:0; left:0; width:0; background:var(--primary); opacity:0; animation:loading-slide 1.8s linear infinite; }
         @keyframes loading-slide {
-            0% { left:-40%; opacity:0; }
-            15% { opacity:1; }
-            60% { opacity:1; }
-            100% { left:100%; opacity:0; }
+            0% { width:0%; opacity:0; }
+            8% { opacity:1; }
+            70% { width:100%; opacity:1; }
+            100% { width:100%; opacity:0; }
         }
         .nav { position:fixed; bottom:0; width:100%; background:var(--nav-bg); backdrop-filter:blur(20px); display:flex; justify-content:space-around; padding:12px; border-top:1px solid var(--border); z-index:100; transition:transform 0.25s var(--ease-out); }
         /* 键盘弹出时导航栏下移隐藏，避免被顶上来 */
